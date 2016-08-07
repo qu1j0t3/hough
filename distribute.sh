@@ -1,3 +1,3 @@
 #!/bin/bash
 
-xargs -L 4 -P 6 ./process-one.sh
+xargs -n 20 -P 6 ./run_skew.sh
