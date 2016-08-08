@@ -56,12 +56,12 @@ for f in sys.argv[1:]:
         row = sums.argmax(0)
 
         # Detect edges
-        edges = binary_dilation( canny(pos[row-100:row+100], 2) )
+        edges = binary_dilation( canny(pos[row-150:row+150], 2) )
         edgesg = greyf(edges)
         # Now try Hough transform
         lines = probabilistic_hough_line(
                  edges,
-                 line_length=pagew*0.2,
+                 line_length=pagew*0.15,
                  line_gap=3,
                  theta=arange(deg2rad(-93.0), deg2rad(-87.0), deg2rad(0.02)))
 
@@ -69,19 +69,19 @@ for f in sys.argv[1:]:
         for ((x0,y0),(x1,y1)) in lines:
             # Ensure line is moving rightwards
             k = 1 if x1 > x0 else -1
-            angles.append( rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
+            angles.append( - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
             rr, cc, val = line_aa(x0=x0, y0=y0, x1=x1, y1=y1)
             for k, v in enumerate(val):
                 edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
 
         if angles:
-            a = - mean(angles)
+            a = mean(angles)
             angle = a
             imsave('out/{}_{}_lines.png'.format(filename, a), edgesg)
-            eprint("{}  angle of longest: {} deg".format(filename, a))
+            eprint("{}  Hough angle: {} deg (mean)   {} deg (median)".format(filename, a, median(angles)))
         else:
             imsave('out/{}_no_lines.png'.format(filename), edgesg)
-            eprint("{}  no lines detected by Probabilistic Hough".format(filename))
+            eprint("{}  FAILED horizontal Hough".format(filename))
 
             t = threshold_otsu(neg)
 
@@ -119,35 +119,45 @@ for f in sys.argv[1:]:
                 # let's brutally dilate everything and look for a vertical margin
                 small = downscale_local_mean(neg, (2,2))
                 # FIXME: This dilation is SLOW
-                dilated = binary_dilation(small > t, disk(33))
+                dilated = binary_dilation(small > t, rectangle(60, 1))
 
                 # The Canny must use a very wide Gaussian to smooth out inter-line bumps
-                edges = canny(dilated, 6)
+                edges = canny(dilated)
                 edgesg = greyf(edges)
                 # Now try Hough transform
+                th = np.concatenate( (arange(deg2rad(-93.0), deg2rad(-87.0), deg2rad(0.02)),
+                                      arange(deg2rad( -3.0), deg2rad(  3.0), deg2rad(0.02))) )
                 lines = probabilistic_hough_line(
                          edges,
                          line_length=pageh*0.05,
-                         line_gap=12,
-                         theta=arange(deg2rad(-3.0), deg2rad(3.0), deg2rad(0.02)))
+                         line_gap=6,
+                         theta=th)
                 eprint(lines)
 
                 angles = []
                 for ((x0,y0),(x1,y1)) in lines:
-                    # Ensure line is moving downwards
-                    k = 1 if y1 > y0 else -1
-                    angles.append( rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
+                    if abs(x1-x0) > abs(y1-y0):
+                        # Horizontal - ensure it's moving East
+                        k = 1 if x1 > x0 else -1
+                        a = rad2deg(math.atan2(k*(y0-y1), k*(x1-x0)))
+                        eprint("  XXX h line a: {}".format(a))
+                    else:
+                        # Vertical - ensure it's moving South
+                        k = 1 if y1 > y0 else -1
+                        a = rad2deg(math.atan2(k*(x1-x0), k*(y1-y0)))
+                        eprint("  XXX v line a: {}".format(a))
+                    angles.append( a )
                     rr, cc, val = line_aa(x0=x0, y0=y0, x1=x1, y1=y1)
                     for k, v in enumerate(val):
                         edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
 
+                imsave('out/{}_dilated.png'.format(filename), dilated)
                 if angles:
-                    a = 90 - mean(angles)
+                    a = mean(angles)
                     angle = a
                     imsave('out/{}_{}_lines_vertical.png'.format(filename, a), edgesg)
-                    eprint("{}  angle vertical: {} deg".format(filename, a))
+                    eprint("{}  angle vertical: {} deg (mean)  {} deg (median)".format(filename, a, median(angles)))
                 else:
-                    imsave('out/{}_dilated.png'.format(filename), dilated)
                     imsave('out/{}_dilate_edges.png'.format(filename), edges)
                     eprint("{}  FAILED vertical".format(filename))
 
