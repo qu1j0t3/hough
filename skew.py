@@ -28,8 +28,12 @@ def eprint(*args, **kwargs):
 # Pipe the output to    ./distribute.sh
 
 def grey(x):
-    return 0.4 if x else 0.0
+    return 0.3 if x else 0.0
 greyf = np.vectorize(grey)
+
+hough_prec = deg2rad(0.02)
+hough_theta_h  = arange(deg2rad(-93.0), deg2rad(-87.0), hough_prec)
+hough_theta_hv = np.concatenate( (arange(deg2rad(-3.0), deg2rad(3.0), hough_prec), hough_theta_h) )
 
 for f in sys.argv[1:]:
     filename = os.path.basename(f)
@@ -57,7 +61,7 @@ for f in sys.argv[1:]:
 
         # Detect edges
         cropped = pos[max(row-150, 0):min(row+150, pageh)]
-        edges = binary_dilation(canny(cropped, 1))
+        edges = binary_dilation(canny(cropped, 2))
         edgesg = greyf(edges)
 
         # Now try Hough transform
@@ -65,7 +69,7 @@ for f in sys.argv[1:]:
                  edges,
                  line_length=pagew*0.15,
                  line_gap=2,
-                 theta=arange(deg2rad(-93.0), deg2rad(-87.0), deg2rad(0.02)))
+                 theta=hough_theta_h)
 
         angles = []
         for ((x0,y0),(x1,y1)) in lines:
@@ -85,41 +89,39 @@ for f in sys.argv[1:]:
             imsave('out/{}_no_lines.png'.format(filename), edgesg)
             eprint("{}  FAILED horizontal Hough".format(filename))
 
-            t = threshold_otsu(neg)
 
             # If we didn't find a good feature at the horizontal sum peak,
             # let's brutally dilate everything and look for a vertical margin
             small = downscale_local_mean(neg, (2,2))
+            t = threshold_otsu(small)
             dilated = binary_dilation(small > t, rectangle(60, 60))
 
             edges = canny(dilated, 3)
             edgesg = greyf(edges)
             # Now try Hough transform
-            th = np.concatenate( (arange(deg2rad(-93.0), deg2rad(-87.0), deg2rad(0.02)),
-                                  arange(deg2rad( -3.0), deg2rad(  3.0), deg2rad(0.02))) )
             lines = probabilistic_hough_line(
                      edges,
                      line_length=pageh*0.04,
                      line_gap=6,
-                     theta=th)
-            eprint(lines)
+                     theta=hough_theta_hv)
 
             angles = []
-            for ((x0,y0),(x1,y1)) in lines:
-                if abs(x1-x0) > abs(y1-y0):
-                    # Horizontal - ensure it's moving East
-                    k = 1 if x1 > x0 else -1
-                    a = rad2deg(math.atan2(k*(y0-y1), k*(x1-x0)))
-                    eprint("{}    h line a: {}".format(filename, a))
+            for ((x_0,y_0),(x_1,y_1)) in lines:
+                # angle is <= π/4 from horizontal or vertical
+                if abs(x_1-x_0) > abs(y_1-y_0):
+                    dir, x0, y0, x1, y1 = 'H',  x_0,  y_0,  x_1,  y_1
                 else:
-                    # Vertical - ensure it's moving South
-                    k = 1 if y1 > y0 else -1
-                    a = rad2deg(math.atan2(k*(x1-x0), k*(y1-y0)))
-                    eprint("{}    v line a: {}".format(filename, a))
-                angles.append( a )
-                rr, cc, val = line_aa(x0=x0, y0=y0, x1=x1, y1=y1)
-                for k, v in enumerate(val):
-                    edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
+                    dir, x0, y0, x1, y1 = 'V',  y_0, -x_0,  y_1, -x_1
+                # flip angle so that X delta is positive (East quadrants).
+                k = 1 if x1 > x0 else -1
+                a = rad2deg(math.atan2(k*(y1-y0), k*(x1-x0)))
+                # Zero angles are suspicious -- could be a cropping margin. If not, they don't add information anyway.
+                if(a != 0):
+                    angles.append( -a )
+                    rr, cc, val = line_aa(x0=x_0, y0=y_0, x1=x_1, y1=y_1)
+                    eprint("{}  line: {} {}   {},{} - {},{}".format(filename, a, dir, x_0, y_0, x_1, y_1))
+                    for k, v in enumerate(val):
+                        edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
 
             if angles:
                 a = mean(angles)
@@ -131,9 +133,5 @@ for f in sys.argv[1:]:
                 imsave('out/{}_dilate_edges.png'.format(filename), edges)
                 eprint("{}  FAILED vertical".format(filename))
 
-    if angle:
-        print("'{}'".format(f))
-        print(angle)
-        print("{}x{}".format(pagew, pageh))
-        print(filename)
-        sys.stdout.flush()
+    print('"{}",{},{},{}'.format(f, angle or '', pagew, pageh))
+    sys.stdout.flush()

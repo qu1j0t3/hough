@@ -1,3 +1,12 @@
 #!/bin/bash
 
-gm convert "$1" -rotate $2 -gravity center -extent $3 process/$4
+echo $1|( IFS=, read FILEPATH ANGLE PAGEW PAGEH
+  # -extent converts it to RGB :(
+  if [ "$ANGLE" ] ; then
+    gm convert "$FILEPATH" \
+      -rotate $ANGLE \
+      -gravity center -extent ${PAGEW}x${PAGEH} \
+      -channel Green \
+      process/`basename "$FILEPATH"`
+  fi
+)
