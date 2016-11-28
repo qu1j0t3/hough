@@ -35,6 +35,11 @@ hough_prec = deg2rad(0.02)
 hough_theta_h  = arange(deg2rad(-93.0), deg2rad(-87.0), hough_prec)
 hough_theta_hv = np.concatenate( (arange(deg2rad(-3.0), deg2rad(3.0), hough_prec), hough_theta_h) )
 
+try:
+    os.mkdir('out')
+except OSError:
+    pass
+
 for f in sys.argv[1:]:
     filename = os.path.basename(f)
     #if i == 30:
@@ -46,6 +51,7 @@ for f in sys.argv[1:]:
     # due to skewing
     pos = crop(page, 150)
 
+    angles = []
     angle = None
     if is_low_contrast(pos):
         eprint("{} - low contrast - blank page?".format(filename))
@@ -71,7 +77,6 @@ for f in sys.argv[1:]:
                  line_gap=2,
                  theta=hough_theta_h)
 
-        angles = []
         for ((x0,y0),(x1,y1)) in lines:
             # Ensure line is moving rightwards
             k = 1 if x1 > x0 else -1
@@ -119,7 +124,7 @@ for f in sys.argv[1:]:
                 if(a != 0):
                     angles.append( -a )
                     rr, cc, val = line_aa(x0=x_0, y0=y_0, x1=x_1, y1=y_1)
-                    eprint("{}  line: {} {}   {},{} - {},{}".format(filename, a, dir, x_0, y_0, x_1, y_1))
+                    #eprint("{}  line: {} {}   {},{} - {},{}".format(filename, a, dir, x_0, y_0, x_1, y_1))
                     for k, v in enumerate(val):
                         edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
 
@@ -133,5 +138,5 @@ for f in sys.argv[1:]:
                 imsave('out/{}_dilate_edges.png'.format(filename), edges)
                 eprint("{}  FAILED vertical".format(filename))
 
-    print('"{}",{},{},{}'.format(f, angle or '', pagew, pageh))
+    print('"{}",{},{},{},{}'.format(f, angle or '', np.var(angles) if angles else '', pagew, pageh))
     sys.stdout.flush()

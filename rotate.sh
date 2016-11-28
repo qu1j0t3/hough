@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo $1|( IFS=, read FILEPATH ANGLE PAGEW PAGEH
+echo $1|( IFS=, read FILEPATH ANGLE VARIANCE PAGEW PAGEH
   # -extent converts it to RGB :(
   if [ "$ANGLE" ] ; then
     gm convert "$FILEPATH" \
