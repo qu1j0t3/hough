@@ -62,7 +62,11 @@ for f in sys.argv[1:]:
     #if i == 30:
     #    exit()
     page = imread(f)
+    if page.ndim == 3:        # probably RGB
+        print("Multichannel - extracting 2nd channel")
+        page = page[:, :, 1]  # extract green channel
     pageh, pagew = page.shape
+    eprint("{} - {}".format(filename, page.shape))
 
     # Remove about 1/4" from page margin, because this is often dirty
     # due to skewing
