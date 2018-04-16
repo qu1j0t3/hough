@@ -32,8 +32,9 @@ from skimage.draw import *
 from skimage import img_as_uint, img_as_ubyte
 from skimage.filters import threshold_otsu
 from skimage.util import crop
-from scipy.ndimage import imread, measurements
-from scipy.misc import imresize, imsave
+from scipy.ndimage import measurements
+from skimage.transform import resize
+from imageio import imread, imwrite
 from numpy import *
 
 import os
@@ -102,17 +103,17 @@ for f in sys.argv[1:]:
             # Ensure line is moving rightwards
             k = 1 if x1 > x0 else -1
             angles.append( - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
-            rr, cc, val = line_aa(x0=x0, y0=y0, x1=x1, y1=y1)
+            rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
             for k, v in enumerate(val):
                 edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
 
         if angles:
             a = mean(angles)
             angle = a
-            imsave('out/{}_{}_lines.png'.format(filename, a), edgesg)
+            imwrite('out/{}_{}_lines.png'.format(filename, a), edgesg)
             eprint("{}  Hough angle: {} deg (mean)   {} deg (median)".format(filename, a, median(angles)))
         else:
-            imsave('out/{}_no_lines.png'.format(filename), edgesg)
+            imwrite('out/{}_no_lines.png'.format(filename), edgesg)
             eprint("{}  FAILED horizontal Hough".format(filename))
 
 
@@ -144,7 +145,7 @@ for f in sys.argv[1:]:
                 # Zero angles are suspicious -- could be a cropping margin. If not, they don't add information anyway.
                 if(a != 0):
                     angles.append( -a )
-                    rr, cc, val = line_aa(x0=x_0, y0=y_0, x1=x_1, y1=y_1)
+                    rr, cc, val = line_aa(c0=x_0, r0=y_0, c1=x_1, r1=y_1)
                     #eprint("{}  line: {} {}   {},{} - {},{}".format(filename, a, dir, x_0, y_0, x_1, y_1))
                     for k, v in enumerate(val):
                         edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
@@ -152,11 +153,11 @@ for f in sys.argv[1:]:
             if angles:
                 a = mean(angles)
                 angle = a
-                imsave('out/{}_{}_lines_vertical.png'.format(filename, a), edgesg)
+                imwrite('out/{}_{}_lines_vertical.png'.format(filename, a), edgesg)
                 eprint("{}  angle vertical: {} deg (mean)  {} deg (median)".format(filename, a, median(angles)))
             else:
-                imsave('out/{}_dilated.png'.format(filename), dilated)
-                imsave('out/{}_dilate_edges.png'.format(filename), edges)
+                imwrite('out/{}_dilated.png'.format(filename), dilated)
+                imwrite('out/{}_dilate_edges.png'.format(filename), edges)
                 eprint("{}  FAILED vertical".format(filename))
 
     print('"{}",{},{},{},{}'.format(f, angle or '', np.var(angles) if angles else '', pagew, pageh))
