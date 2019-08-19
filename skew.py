@@ -1,8 +1,8 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 #    This file is part of "hough", which detects skew angles in scanned images
-#    Copyright (C) 2016 Toby Thain, toby@telegraphics.com.au
+#    Copyright (C) 2016-2019 Toby Thain, toby@telegraphics.com.au
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -42,8 +42,6 @@ import sys
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
-
-# Pipe the output to    ./distribute.sh
 
 def grey(x):
     return 0.3 if x else 0.0
@@ -89,6 +87,8 @@ for f in sys.argv[1:]:
 
         # Detect edges
         cropped = pos[max(row-150, 0):min(row+150, pageh)]
+        # This dilation is dangerous if it's going to touch the page edges,
+        # since then a lot of 0/90° lines will be found, likely ruining the results.
         edges = binary_dilation(canny(cropped, 2))
         edgesg = greyf(edges)
 
@@ -154,6 +154,7 @@ for f in sys.argv[1:]:
                 a = mean(angles)
                 angle = a
                 imwrite('out/{}_{}_lines_vertical.png'.format(filename, a), edgesg)
+                imwrite('out/{}_{}_lines_verticaldilated.png'.format(filename, a), bool_to_255f(dilated))
                 eprint("{}  angle vertical: {} deg (mean)  {} deg (median)".format(filename, a, median(angles)))
             else:
                 imwrite('out/{}_dilated.png'.format(filename), dilated)
