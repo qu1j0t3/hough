@@ -1,0 +1,9 @@
+*.tif
+*.pdf
+COPYING
+Dockerfile
+genii-hpmanual
+mattis
+mattis-test
+vdm
+venv

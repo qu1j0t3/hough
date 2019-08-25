@@ -47,6 +47,10 @@ def grey(x):
     return 0.3 if x else 0.0
 greyf = np.vectorize(grey)
 
+def bool_to_255(x):
+    return 255 if x else 0
+bool_to_255f = np.vectorize(bool_to_255)
+
 hough_prec = deg2rad(0.02)
 hough_theta_h  = arange(deg2rad(-93.0), deg2rad(-87.0), hough_prec)
 hough_theta_hv = np.concatenate( (arange(deg2rad(-3.0), deg2rad(3.0), hough_prec), hough_theta_h) )
@@ -95,7 +99,7 @@ for f in sys.argv[1:]:
         # Now try Hough transform
         lines = probabilistic_hough_line(
                  edges,
-                 line_length=pagew*0.15,
+                 line_length=int(pagew*0.15),
                  line_gap=2,
                  theta=hough_theta_h)
 
