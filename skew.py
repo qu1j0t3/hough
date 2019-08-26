@@ -125,14 +125,14 @@ for f in sys.argv[1:]:
             # let's brutally dilate everything and look for a vertical margin
             small = downscale_local_mean(neg, (2,2))
             t = threshold_otsu(small)
-            dilated = binary_dilation(small > t, rectangle(60, 60))
+            dilated = binary_dilation(small > t, np.ones((60,60)))
 
             edges = canny(dilated, 3)
             edgesg = greyf(edges)
             # Now try Hough transform
             lines = probabilistic_hough_line(
                      edges,
-                     line_length=pageh*0.04,
+                     line_length=int(pageh*0.04),
                      line_gap=6,
                      theta=hough_theta_hv)
 
