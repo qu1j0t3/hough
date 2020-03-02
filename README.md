@@ -18,12 +18,12 @@ formats, and both grey scale and RGB images.
   but the output quality will be less than desired. For best results,
   it is very important that deskewing is done on grey scale (or RGB) files.
 
-*Most of the heuristics are tuned for resolutions around 300-600 dpi.*
+**Most of the heuristics are tuned for resolutions around 300-600 dpi.**
 
 If you want to see example documents, just about all of
 [these files](http://docs.telegraphics.com.au/) have been deskewed this way.
 
-*Please note:* This is an inexact process, with many heuristics discovered
+**Please note:** This is an inexact process, with many heuristics discovered
 by trial and error, and this software is still being improved.
 It has worked on many thousands of pages of my own material, of varied layouts,
 but may not work well on your material without tuning and modification.
@@ -82,8 +82,8 @@ Note that `skew.py` cannot always determine a skew for a page
 (in my experience much less than 1% of the time, depending on source material).
 Therefore it produces debugging images for review, in the `out/` directory
 in the working directory.
-*You should review these files before shipping the final result.
-Or at least, review the auto-rotated pages.*
+**You should review these files before shipping the final result.
+Or at least, review the auto-rotated pages.**
 
 ### Batch skew analysis and rotation
 
@@ -99,10 +99,11 @@ Output, file per page, is to the `process/` directory in the current
 working directory (which can be a symlink to somewhere else).
 
 
-* - I use a *Fujitsu fi-4530C, USB model,* which is fast, high quality,
-    and cheaply available on ebay if you have some patience to deal with
-    its Windows XP driver (VirtualBox works). I've done thousands of pages
-    with mine.
+`*` - I use a *Fujitsu fi-4530C, USB model,* which is fast, high quality,
+and cheaply available on ebay if you have some patience to deal with
+its Windows XP driver (VirtualBox works). I've done thousands of pages
+with mine.
+
 
 
     This file is part of "hough", which detects skew angles in scanned images
