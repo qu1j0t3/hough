@@ -7,7 +7,7 @@ matplotlib==2.2.2
 networkx==2.1
 numpy==1.18.1
 olefile==0.46
-Pillow==4.3.0
+Pillow==6.2.0
 pkg-resources==0.0.0
 pyparsing==2.2.0
 python-dateutil==2.7.2
