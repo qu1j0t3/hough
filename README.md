@@ -46,7 +46,7 @@ but may not work well on your material without tuning and modification.
 #### Troubleshooting
 
 * If you see `error: invalid command 'bdist_wheel'`,
-  try (from [this page](https://stackoverflow.com/a/44862371/173515):
+  try (from [this page](https://stackoverflow.com/a/44862371/173515)):
   - `pip install wheel`
   - `pip install -r requirements.txt`
 
@@ -78,8 +78,8 @@ The CSV columns are:
 #### Debugging output
 
 Note that `skew.py` cannot always determine a skew for a page
-(e.g. blank pages in particular), and will sometimes get the skew wrong
-(in my experience much less than 1% of the time, depending on source material).
+(e.g. blank pages in particular), and will very occasionally get the skew wrong
+(depending on source material).
 Therefore it produces debugging images for review, in the `out/` directory
 in the working directory.
 **You should review these files before shipping the final result.
@@ -97,10 +97,11 @@ I have an 8 core machine, so I typically use six.)
 
 Output, file per page, is to the `process/` directory in the current
 working directory (which can be a symlink to somewhere else).
+The input files are left unchanged.
 
 
-`*` - I use a *Fujitsu fi-4530C, USB model,* which is fast, high quality,
-and cheaply available on ebay if you have some patience to deal with
+`*` - I use a **Fujitsu fi-4530C, USB model,** which is fast, high quality,
+and cheaply available on ebay if you can deal with
 its Windows XP driver (VirtualBox works). I've done thousands of pages
 with mine.
 
