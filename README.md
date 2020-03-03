@@ -50,6 +50,10 @@ but may not work well on your material without tuning and modification.
   - `pip install wheel`
   - `pip install -r requirements.txt`
 
+* If you see `ModuleNotFoundError: No module named 'imageio'`,
+  make sure you have activated the venv created during setup:
+  - `source .venv/bin/activate`
+
 ### How can I get skew angles for my pages
 
 The skew calculator is `skew.py`.
