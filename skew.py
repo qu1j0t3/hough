@@ -53,7 +53,11 @@ bool_to_255f = np.vectorize(bool_to_255)
 
 hough_prec = deg2rad(0.02)
 hough_theta_h  = arange(deg2rad(-93.0), deg2rad(-87.0), hough_prec)
-hough_theta_hv = np.concatenate( (arange(deg2rad(-3.0), deg2rad(3.0), hough_prec), hough_theta_h) )
+hough_theta_v  = arange(deg2rad(-3.0), deg2rad(3.0), hough_prec)
+hough_theta_hv = np.concatenate( (hough_theta_v, hough_theta_h) )
+
+def sum(a):
+    return a.sum()
 
 try:
     os.mkdir('out')
@@ -83,43 +87,69 @@ for f in sys.argv[1:]:
         #neg = img_as_ubyte(pos < t)
         neg = 255-pos
 
+        # ----------
         # find row with maximum sum - this should pass thru the centre of the horizontal rule
-        def sum(a):
-            return a.sum()
-        sums = np.apply_along_axis(sum, 1, neg)
-        row = sums.argmax(0)
+
+        vsums = np.apply_along_axis(sum, 1, neg)
+        row = vsums.argmax(0)
 
         # Detect edges
         cropped = pos[max(row-150, 0):min(row+150, pageh)]
         # This dilation is dangerous if it's going to touch the page edges,
         # since then a lot of 0/90° lines will be found, likely ruining the results.
         edges = binary_dilation(canny(cropped, 2))
-        edgesg = greyf(edges)
+        hedgesg = greyf(edges)
 
         # Now try Hough transform
-        lines = probabilistic_hough_line(
-                 edges,
-                 line_length=int(pagew*0.15),
-                 line_gap=2,
-                 theta=hough_theta_h)
+        lines = probabilistic_hough_line( edges, line_length=int(pagew*0.15), line_gap=2, theta=hough_theta_h)
 
+        hangles = []
         for ((x0,y0),(x1,y1)) in lines:
             # Ensure line is moving rightwards
             k = 1 if x1 > x0 else -1
-            angles.append( - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
+            hangles.append( - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
             rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
             for k, v in enumerate(val):
-                edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
+                hedgesg[rr[k], cc[k]] = (1-v)*hedgesg[rr[k], cc[k]] + v
 
-        if angles:
-            a = mean(angles)
-            angle = a
-            imwrite('out/{}_{}_lines.png'.format(filename, a), edgesg)
-            eprint("{}  Hough angle: {} deg (mean)   {} deg (median)".format(filename, a, median(angles)))
+        # ----------
+        # find col with maximum sum - this should pass thru the centre of a vertical rule
+
+        hsums = np.apply_along_axis(sum, 0, neg)
+        col = hsums.argmax(0)
+
+        # Detect edges
+        cropped = pos[:, max(col-150, 0):min(col+150, pageh)]
+        c = canny(cropped, 2)
+        edges = binary_dilation(c)
+        vedgesg = greyf(edges)
+
+        # Now try Hough transform
+        lines = probabilistic_hough_line( edges, line_length=int(pageh*0.15), line_gap=2, theta=hough_theta_v)
+
+        vangles = []
+        for ((x0,y0),(x1,y1)) in lines:
+            # Ensure line is moving upwards
+            k = 1 if y1 > y0 else -1
+            vangles.append( 90 - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
+            rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
+            for k, v in enumerate(val):
+                vedgesg[rr[k], cc[k]] = (1-v)*vedgesg[rr[k], cc[k]] + v
+        # ----------
+
+        if hangles and vsums[row] > hsums[col]:
+            angle = a = median(hangles)
+            imwrite('out/{}_{}_hlines.png'.format(filename, a), hedgesg)
+            eprint("{}  Hough H angle: {} deg (median)".format(filename, a))
+        elif vangles:
+            angle = a = median(vangles)
+            imwrite('out/{}_{}_vlines.png'.format(filename, a), vedgesg)
+            eprint("{}  Hough V angle: {} deg (median)".format(filename, a))
         else:
-            imwrite('out/{}_no_lines.png'.format(filename), edgesg)
+            imwrite('out/{}_no_hlines.png'.format(filename), hedgesg)
             eprint("{}  FAILED horizontal Hough".format(filename))
-
+            imwrite('out/{}_no_vlines.png'.format(filename), vedgesg)
+            eprint("{}  FAILED vertical Hough".format(filename))
 
             # If we didn't find a good feature at the horizontal sum peak,
             # let's brutally dilate everything and look for a vertical margin
