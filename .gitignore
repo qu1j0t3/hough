@@ -1,0 +1,8 @@
+.venv/
+in/
+process/
+out/
+*~
+*.swp
+*.log
+*.csv
