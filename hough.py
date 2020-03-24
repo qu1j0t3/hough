@@ -33,14 +33,17 @@ Options:
 
 """
 
-from docopt import docopt
-from imageio import imread, imwrite
 import logging
 import logging.config
 import logging.handlers
-from multiprocessing import Process, Queue
-import numpy as np
 import os
+import threading
+from multiprocessing import Queue
+
+import numpy as np
+from docopt import docopt
+from imageio import imread, imwrite
+from skimage.color import rgb2gray
 from skimage.draw import line_aa
 from skimage.exposure import is_low_contrast
 from skimage.feature import canny
@@ -48,11 +51,11 @@ from skimage.filters import threshold_otsu
 from skimage.morphology import binary_dilation
 from skimage.transform import downscale_local_mean, probabilistic_hough_line
 from skimage.util import crop
-import sys
-import threading
-import time
 
 VERSION = "hough 0.2"
+WINDOW_SIZE = 150
+
+# numpy's little helpers
 
 
 def grey(x):
@@ -67,6 +70,14 @@ def sum(a):
     return a.sum()
 
 
+bool_to_255f = np.vectorize(bool_to_255)
+greyf = np.vectorize(grey)
+hough_prec = np.deg2rad(0.02)
+hough_theta_h = np.arange(np.deg2rad(-93.0), np.deg2rad(-87.0), hough_prec)
+hough_theta_v = np.arange(np.deg2rad(-3.0), np.deg2rad(3.0), hough_prec)
+hough_theta_hv = np.concatenate((hough_theta_v, hough_theta_h))
+
+
 def logger_thread(q):
     while True:
         record = q.get()
@@ -76,14 +87,48 @@ def logger_thread(q):
         logger.handle(record)
 
 
-greyf = np.vectorize(grey)
+def hough_angles(pos, neg, orientation="row"):
+    height, width = pos.shape
+    if orientation == "row":
+        axis = 1
+        length = int(width * 0.15)
+        theta = hough_theta_h
+    else:
+        axis = 0
+        length = int(height * 0.15)
+        theta = hough_theta_v
+    sums = np.apply_along_axis(sum, axis, neg)
+    line = sums.argmax(0)
 
-bool_to_255f = np.vectorize(bool_to_255)
+    # Grab a +/- WINDOW-SIZE strip for evaluation. We've already cropped out the margins.
+    if orientation == "row":
+        cropped = pos[
+            max(line - WINDOW_SIZE, 0) : min(line + WINDOW_SIZE, height)  # noqa: E203
+        ]
+    else:
+        cropped = pos[
+            :, max(line - WINDOW_SIZE, 0) : min(line + WINDOW_SIZE, width)  # noqa: E203
+        ]
+    edges = binary_dilation(canny(cropped, 2))
+    edges_grey = greyf(edges)
 
-hough_prec = np.deg2rad(0.02)
-hough_theta_h = np.arange(np.deg2rad(-93.0), np.deg2rad(-87.0), hough_prec)
-hough_theta_v = np.arange(np.deg2rad(-3.0), np.deg2rad(3.0), hough_prec)
-hough_theta_hv = np.concatenate((hough_theta_v, hough_theta_h))
+    lines = probabilistic_hough_line(edges, line_length=length, line_gap=2, theta=theta)
+
+    angles = []
+    for ((x0, y0), (x1, y1)) in lines:
+        # Ensure line is moving rightwards/upwards
+        if orientation == "row":
+            k = 1 if x1 > x0 else -1
+            offset = 0
+        else:
+            k = 1 if y1 > y0 else -1
+            offset = 90
+        angles.append(offset - np.rad2deg(np.math.atan2(k * (y1 - y0), k * (x1 - x0))))
+        rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
+        for k, v in enumerate(val):
+            edges_grey[rr[k], cc[k]] = (1 - v) * edges_grey[rr[k], cc[k]] + v
+
+    return (angles, sums[line], edges_grey)
 
 
 if __name__ == "__main__":
@@ -97,10 +142,10 @@ if __name__ == "__main__":
                 "class": "logging.Formatter",
                 "format": "%(asctime)s %(name)-15s %(levelname)-8s %(processName)-10s %(message)s",
             },
-            "raw": {"class": "logging.Formatter", "format": "%(message)s",},
+            "raw": {"class": "logging.Formatter", "format": "%(message)s"},
         },
         "handlers": {
-            "console": {"class": "logging.StreamHandler", "level": "INFO",},
+            "console": {"class": "logging.StreamHandler", "level": "INFO"},
             "file": {
                 "class": "logging.FileHandler",
                 "filename": "hough.log",
@@ -129,147 +174,97 @@ if __name__ == "__main__":
         pass
 
     for f in arguments.FILE:
-        filename = os.path.basename(f)
         logger.info(f"Processing {f}")
+        filename = os.path.basename(f)
         page = imread(f)
-        if page.ndim == 3:  # probably RGB
-            logger.debug("Multichannel - extracting 2nd channel")
-            page = page[:, :, 1]  # extract green channel
+
+        if page.ndim != 1:  # probably RGB
+            logger.debug("Multichannel - converting to grayscale")
+            page = rgb2gray(page)
         pageh, pagew = page.shape
         logger.debug("{} - {}".format(filename, page.shape))
 
-        # Remove about 1/4" from page margin, because this is often dirty
-        # due to skewing
-        pos = crop(page, 150)
+        # Remove the margins, which are often dirty due to skewing
+        # 0.33" of an 8.5" page is approximately 1/25th
+        pos = crop(page, pagew // 25)
 
-        angles = []
-        angle = None
         if is_low_contrast(pos):
             logger.debug("{} - low contrast - blank page?".format(filename))
+            logger_csv.info(f'"{f}","","",{pagew},{pageh}')
+            continue
+
+        neg = 255 - pos
+
+        h_angles, v_sums_row, h_edges_grey = hough_angles(pos, neg, "row")
+        v_angles, h_sums_col, v_edges_grey = hough_angles(pos, neg, "column")
+
+        angles = []
+
+        if h_angles and v_sums_row > h_sums_col:
+            angle = np.median(h_angles)
+            imwrite("out/{}_{}_hlines.png".format(filename, angle), h_edges_grey)
+            logger.debug("{}  Hough H angle: {} deg (median)".format(filename, angle))
+        elif v_angles:
+            angle = np.median(v_angles)
+            imwrite("out/{}_{}_vlines.png".format(filename, angle), v_edges_grey)
+            logger.debug("{}  Hough V angle: {} deg (median)".format(filename, angle))
         else:
-            neg = 255 - pos
+            imwrite("out/{}_no_hlines.png".format(filename), h_edges_grey)
+            logger.debug("{}  FAILED horizontal Hough".format(filename))
+            imwrite("out/{}_no_vlines.png".format(filename), v_edges_grey)
+            logger.debug("{}  FAILED vertical Hough".format(filename))
 
-            # ----------
-            # find row with maximum sum - this should pass thru the centre of the horizontal rule
+            # We didn't find a good feature at the H or V sum peaks.
+            # Let's brutally dilate everything and look for a vertical margin!
+            small = downscale_local_mean(neg, (2, 2))
+            t = threshold_otsu(small)
+            dilated = binary_dilation(small > t, np.ones((60, 60)))
 
-            vsums = np.apply_along_axis(sum, 1, neg)
-            row = vsums.argmax(0)
-
-            # Detect edges
-            cropped = pos[max(row - 150, 0) : min(row + 150, pageh)]
-            # This dilation is dangerous if it's going to touch the page edges,
-            # since then a lot of 0/90° lines will be found, likely ruining the results.
-            edges = binary_dilation(canny(cropped, 2))
-            hedgesg = greyf(edges)
-
-            # Now try Hough transform
+            edges = canny(dilated, 3)
+            edges_grey = greyf(edges)
             lines = probabilistic_hough_line(
-                edges, line_length=int(pagew * 0.15), line_gap=2, theta=hough_theta_h
+                edges, line_length=int(pageh * 0.04), line_gap=6, theta=hough_theta_hv,
             )
 
-            hangles = []
-            for ((x0, y0), (x1, y1)) in lines:
-                # Ensure line is moving rightwards
-                k = 1 if x1 > x0 else -1
-                hangles.append(-np.rad2deg(np.math.atan2(k * (y1 - y0), k * (x1 - x0))))
-                rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
-                for k, v in enumerate(val):
-                    hedgesg[rr[k], cc[k]] = (1 - v) * hedgesg[rr[k], cc[k]] + v
-
-            # ----------
-            # find col with maximum sum - this should pass thru the centre of a vertical rule
-
-            hsums = np.apply_along_axis(sum, 0, neg)
-            col = hsums.argmax(0)
-
-            # Detect edges
-            cropped = pos[:, max(col - 150, 0) : min(col + 150, pageh)]
-            c = canny(cropped, 2)
-            edges = binary_dilation(c)
-            vedgesg = greyf(edges)
-
-            # Now try Hough transform
-            lines = probabilistic_hough_line(
-                edges, line_length=int(pageh * 0.15), line_gap=2, theta=hough_theta_v
-            )
-
-            vangles = []
-            for ((x0, y0), (x1, y1)) in lines:
-                # Ensure line is moving upwards
-                k = 1 if y1 > y0 else -1
-                vangles.append(
-                    90 - np.rad2deg(np.math.atan2(k * (y1 - y0), k * (x1 - x0)))
-                )
-                rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
-                for k, v in enumerate(val):
-                    vedgesg[rr[k], cc[k]] = (1 - v) * vedgesg[rr[k], cc[k]] + v
-            # ----------
-
-            if hangles and vsums[row] > hsums[col]:
-                angle = a = np.median(hangles)
-                imwrite("out/{}_{}_hlines.png".format(filename, a), hedgesg)
-                logger.debug("{}  Hough H angle: {} deg (median)".format(filename, a))
-            elif vangles:
-                angle = a = np.median(vangles)
-                imwrite("out/{}_{}_vlines.png".format(filename, a), vedgesg)
-                logger.debug("{}  Hough V angle: {} deg (median)".format(filename, a))
-            else:
-                imwrite("out/{}_no_hlines.png".format(filename), hedgesg)
-                logger.debug("{}  FAILED horizontal Hough".format(filename))
-                imwrite("out/{}_no_vlines.png".format(filename), vedgesg)
-                logger.debug("{}  FAILED vertical Hough".format(filename))
-
-                # If we didn't find a good feature at the horizontal sum peak,
-                # let's brutally dilate everything and look for a vertical margin
-                small = downscale_local_mean(neg, (2, 2))
-                t = threshold_otsu(small)
-                dilated = binary_dilation(small > t, np.ones((60, 60)))
-
-                edges = canny(dilated, 3)
-                edgesg = greyf(edges)
-                # Now try Hough transform
-                lines = probabilistic_hough_line(
-                    edges,
-                    line_length=int(pageh * 0.04),
-                    line_gap=6,
-                    theta=hough_theta_hv,
-                )
-
-                angles = []
-                for ((x_0, y_0), (x_1, y_1)) in lines:
+            for ((x_0, y_0), (x_1, y_1)) in lines:
+                if abs(x_1 - x_0) > abs(y_1 - y_0):
                     # angle is <= π/4 from horizontal or vertical
-                    if abs(x_1 - x_0) > abs(y_1 - y_0):
-                        dir, x0, y0, x1, y1 = "H", x_0, y_0, x_1, y_1
-                    else:
-                        dir, x0, y0, x1, y1 = "V", y_0, -x_0, y_1, -x_1
-                    # flip angle so that X delta is positive (East quadrants).
-                    k = 1 if x1 > x0 else -1
-                    a = np.rad2deg(np.math.atan2(k * (y1 - y0), k * (x1 - x0)))
-                    # Zero angles are suspicious -- could be a cropping margin. If not, they don't add information anyway.
-                    if a != 0:
-                        angles.append(-a)
-                        rr, cc, val = line_aa(c0=x_0, r0=y_0, c1=x_1, r1=y_1)
-                        # logger.debut("{}  line: {} {}   {},{} - {},{}".format(filename, a, dir, x_0, y_0, x_1, y_1))
-                        for k, v in enumerate(val):
-                            edgesg[rr[k], cc[k]] = (1 - v) * edgesg[rr[k], cc[k]] + v
-
-                if angles:
-                    a = np.mean(angles)
-                    angle = a
-                    imwrite("out/{}_{}_lines_vertical.png".format(filename, a), edgesg)
-                    imwrite(
-                        "out/{}_{}_lines_verticaldilated.png".format(filename, a),
-                        bool_to_255f(dilated),
-                    )
-                    logger.debug(
-                        "{}  angle vertical: {} deg (mean)  {} deg (median)".format(
-                            filename, a, np.median(angles)
-                        )
-                    )
+                    dir, x0, y0, x1, y1 = "H", x_0, y_0, x_1, y_1
                 else:
-                    imwrite("out/{}_dilated.png".format(filename), dilated)
-                    imwrite("out/{}_dilate_edges.png".format(filename), edges)
-                    logger.debug("{}  FAILED vertical".format(filename))
+                    dir, x0, y0, x1, y1 = "V", y_0, -x_0, y_1, -x_1
+                # flip angle so that X delta is positive (East quadrants).
+                k = 1 if x1 > x0 else -1
+                a = np.rad2deg(np.math.atan2(k * (y1 - y0), k * (x1 - x0)))
+
+                # Zero angles are suspicious -- could be a cropping margin.
+                # If not, they don't add information anyway.
+                if a != 0:
+                    angles.append(-a)
+                    rr, cc, val = line_aa(c0=x_0, r0=y_0, c1=x_1, r1=y_1)
+                    for k, v in enumerate(val):
+                        edges_grey[rr[k], cc[k]] = (1 - v) * edges_grey[
+                            rr[k], cc[k]
+                        ] + v
+
+            if angles:
+                angle = np.mean(angles)
+                imwrite(
+                    "out/{}_{}_lines_vertical.png".format(filename, angle), edges_grey
+                )
+                imwrite(
+                    "out/{}_{}_lines_verticaldilated.png".format(filename, angle),
+                    bool_to_255f(dilated),
+                )
+                logger.debug(
+                    "{}  angle vertical: {} deg (mean)  {} deg (median)".format(
+                        filename, angle, np.median(angles)
+                    )
+                )
+            else:
+                angle = None
+                imwrite("out/{}_dilated.png".format(filename), dilated)
+                imwrite("out/{}_dilate_edges.png".format(filename), edges)
+                logger.debug("{}  FAILED vertical".format(filename))
 
         logger_csv.info(
             '"{}",{},{},{},{}'.format(
