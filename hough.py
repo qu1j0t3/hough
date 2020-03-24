@@ -21,18 +21,22 @@
 """hough - straighten scanned pages using the Hough transform.
 
 Usage:
-  hough [-hv] FILE ...
+  hough [options] <file>...
 
 Arguments:
-  FILE              Input file(s) to process
+  file                   Input file(s) to process
 
 Options:
-  -h --help         Display this help and exit
-  --version         Display the version number and exit
-  -v --verbose      print status messages
-
+  -h --help                     Display this help and exit
+  -v --verbose                  print status messages
+  --version                     Display the version number and exit
+  -c --csv                      Save rotation results in CSV format
+  --results=<file>              Save rotation results to named file.
+                                Extension comes from format (.csv, ...)
+                                [default: results]
 """
 
+import datetime
 import logging
 import logging.config
 import logging.handlers
@@ -132,7 +136,13 @@ def hough_angles(pos, neg, orientation="row"):
 
 
 if __name__ == "__main__":
-    arguments = docopt(__doc__, version=VERSION)
+    arguments = docopt(version=VERSION, more_magic=True)
+
+    if arguments.debug:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
+    results_file = arguments.results + ".csv"
 
     logq = Queue()
     logd = {
@@ -145,41 +155,52 @@ if __name__ == "__main__":
             "raw": {"class": "logging.Formatter", "format": "%(message)s"},
         },
         "handlers": {
-            "console": {"class": "logging.StreamHandler", "level": "INFO"},
+            "console": {"class": "logging.StreamHandler", "level": log_level},
             "file": {
                 "class": "logging.FileHandler",
                 "filename": "hough.log",
-                "mode": "w",
+                "mode": "a",
                 "formatter": "detailed",
+                "level": logging.DEBUG,
             },
             "csv": {
                 "class": "logging.FileHandler",
-                "filename": "results.csv",
-                "mode": "w",
+                "filename": results_file,
+                "mode": "a",
                 "formatter": "raw",
             },
         },
-        "loggers": {"csv": {"handlers": ["csv"]}},
-        "root": {"level": "DEBUG", "handlers": ["console", "file"]},
+        "loggers": {
+            "csv": {"handlers": ["csv"]},
+            "hough": {"handlers": ["file", "console"]},
+        },
+        "root": {"level": logging.DEBUG, "handlers": []},
     }
     logging.config.dictConfig(logd)
     lp = threading.Thread(target=logger_thread, args=(logq,))
     lp.start()
     logger = logging.getLogger("hough")
-    logger_csv = logging.getLogger("csv")
+    if arguments.verbose:
+        logger.info(f"=== Run started @ {datetime.datetime.utcnow().isoformat()} ===")
+    if arguments.csv:
+        logger_csv = logging.getLogger("csv")
+        if not os.path.isfile(results_file):
+            logger_csv.info(
+                '"Input File","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
+            )
 
     try:
         os.mkdir("out")
     except OSError:
         pass
 
-    for f in arguments.FILE:
+    for f in arguments.file:
         logger.info(f"Processing {f}")
         filename = os.path.basename(f)
         page = imread(f)
 
-        if page.ndim != 1:  # probably RGB
-            logger.debug("Multichannel - converting to grayscale")
+        if page.ndim > 2:
+            logger.debug(f"{f} is multichannel - converting to grayscale")
             page = rgb2gray(page)
         pageh, pagew = page.shape
         logger.debug("{} - {}".format(filename, page.shape))
@@ -266,12 +287,16 @@ if __name__ == "__main__":
                 imwrite("out/{}_dilate_edges.png".format(filename), edges)
                 logger.debug("{}  FAILED vertical".format(filename))
 
-        logger_csv.info(
-            '"{}",{},{},{},{}'.format(
-                f, angle or "", np.var(angles) if angles else "", pagew, pageh
+        if arguments.csv:
+            logger_csv.info(
+                '"{}",{},{},{},{}'.format(
+                    f, angle or "", np.var(angles) if angles else "", pagew, pageh
+                )
             )
-        )
 
     # end logging thread
     logq.put(None)
     lp.join()
+
+    if arguments.verbose:
+        logger.info(f"=== Run ended @ {datetime.datetime.utcnow().isoformat()} ===")
