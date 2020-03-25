@@ -29,6 +29,8 @@ Arguments:
 Options:
   -h --help                     Display this help and exit
   -v --verbose                  print status messages
+  -d --debug                    retain debug image output in out/ directory
+                                (also enables --verbose)
   --version                     Display the version number and exit
   -c --csv                      Save rotation results in CSV format
   --results=<file>              Save rotation results to named file.
@@ -42,7 +44,7 @@ import logging.config
 import logging.handlers
 import os
 import threading
-from multiprocessing import Queue
+from multiprocessing import Process, Queue
 
 import numpy as np
 from docopt import docopt
@@ -139,10 +141,14 @@ if __name__ == "__main__":
     arguments = docopt(version=VERSION, more_magic=True)
 
     if arguments.debug:
+        arguments["verbose"] = True
         log_level = logging.DEBUG
-    else:
+    elif arguments.verbose:
         log_level = logging.INFO
+    else:
+        log_level = logging.WARNING
     results_file = arguments.results + ".csv"
+    arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
 
     logq = Queue()
     logd = {
@@ -180,8 +186,7 @@ if __name__ == "__main__":
     lp = threading.Thread(target=logger_thread, args=(logq,))
     lp.start()
     logger = logging.getLogger("hough")
-    if arguments.verbose:
-        logger.info(f"=== Run started @ {datetime.datetime.utcnow().isoformat()} ===")
+    logger.info(f"=== Run started @ {arguments.now} ===")
     if arguments.csv:
         logger_csv = logging.getLogger("csv")
         if not os.path.isfile(results_file):
@@ -189,10 +194,8 @@ if __name__ == "__main__":
                 '"Input File","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
             )
 
-    try:
-        os.mkdir("out")
-    except OSError:
-        pass
+    if arguments.debug and not os.path.isdir(f"out/{arguments.now}"):
+        os.makedirs(f"out/{arguments.now}")
 
     for f in arguments.file:
         logger.info(f"Processing {f}")
@@ -203,14 +206,14 @@ if __name__ == "__main__":
             logger.debug(f"{f} is multichannel - converting to grayscale")
             page = rgb2gray(page)
         pageh, pagew = page.shape
-        logger.debug("{} - {}".format(filename, page.shape))
+        logger.debug(f"{filename} - {page.shape}")
 
         # Remove the margins, which are often dirty due to skewing
         # 0.33" of an 8.5" page is approximately 1/25th
         pos = crop(page, pagew // 25)
 
         if is_low_contrast(pos):
-            logger.debug("{} - low contrast - blank page?".format(filename))
+            logger.debug(f"{filename} - low contrast - blank page?")
             logger_csv.info(f'"{f}","","",{pagew},{pageh}')
             continue
 
@@ -223,17 +226,23 @@ if __name__ == "__main__":
 
         if h_angles and v_sums_row > h_sums_col:
             angle = np.median(h_angles)
-            imwrite("out/{}_{}_hlines.png".format(filename, angle), h_edges_grey)
-            logger.debug("{}  Hough H angle: {} deg (median)".format(filename, angle))
+            if arguments.debug:
+                imwrite(
+                    f"out/{arguments.now}/{filename}_{angle}_hlines.png", h_edges_grey
+                )
+            logger.debug(f"{filename}  Hough H angle: {angle} deg (median)")
         elif v_angles:
             angle = np.median(v_angles)
-            imwrite("out/{}_{}_vlines.png".format(filename, angle), v_edges_grey)
-            logger.debug("{}  Hough V angle: {} deg (median)".format(filename, angle))
+            if arguments.debug:
+                imwrite(
+                    f"out/{arguments.now}/{filename}_{angle}_vlines.png", v_edges_grey
+                )
+            logger.debug(f"{filename}  Hough V angle: {angle} deg (median)")
         else:
-            imwrite("out/{}_no_hlines.png".format(filename), h_edges_grey)
-            logger.debug("{}  FAILED horizontal Hough".format(filename))
-            imwrite("out/{}_no_vlines.png".format(filename), v_edges_grey)
-            logger.debug("{}  FAILED vertical Hough".format(filename))
+            if arguments.debug:
+                imwrite(f"out/{arguments.now}/{filename}_no_hlines.png", h_edges_grey)
+                imwrite(f"out/{arguments.now}/{filename}_no_vlines.png", v_edges_grey)
+            logger.debug(f"{filename}  FAILED peak sum horizontal & vertical Hough")
 
             # We didn't find a good feature at the H or V sum peaks.
             # Let's brutally dilate everything and look for a vertical margin!
@@ -269,23 +278,24 @@ if __name__ == "__main__":
 
             if angles:
                 angle = np.mean(angles)
-                imwrite(
-                    "out/{}_{}_lines_vertical.png".format(filename, angle), edges_grey
-                )
-                imwrite(
-                    "out/{}_{}_lines_verticaldilated.png".format(filename, angle),
-                    bool_to_255f(dilated),
-                )
-                logger.debug(
-                    "{}  angle vertical: {} deg (mean)  {} deg (median)".format(
-                        filename, angle, np.median(angles)
+                if arguments.debug:
+                    imwrite(
+                        f"out/{arguments.now}/{filename}_{angle}_lines_vertical.png",
+                        edges_grey,
                     )
+                    imwrite(
+                        f"out/{arguments.now}/{filename}_{angle}_lines_verticaldilated.png",
+                        bool_to_255f(dilated),
+                    )
+                logger.debug(
+                    f"{filename}  angle vertical: {angle} deg (mean)  {np.median(angles)} deg (median)"
                 )
             else:
                 angle = None
-                imwrite("out/{}_dilated.png".format(filename), dilated)
-                imwrite("out/{}_dilate_edges.png".format(filename), edges)
-                logger.debug("{}  FAILED vertical".format(filename))
+                if arguments.debug:
+                    imwrite(f"out/{arguments.now}/{filename}_dilated.png", dilated)
+                    imwrite(f"out/{arguments.now}/{filename}_dilate_edges.png", edges)
+                logger.debug("{}  FAILED dilated vertical Hough".format(filename))
 
         if arguments.csv:
             logger_csv.info(
@@ -298,5 +308,4 @@ if __name__ == "__main__":
     logq.put(None)
     lp.join()
 
-    if arguments.verbose:
-        logger.info(f"=== Run ended @ {datetime.datetime.utcnow().isoformat()} ===")
+    logger.info(f"=== Run ended @ {datetime.datetime.utcnow().isoformat()} ===")
