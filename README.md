@@ -1,129 +1,137 @@
-## A program for finding document skew angles using the Hough transform
+# hough - Skew detection in scanned images
 
-I developed this to meet my scanning needs, since scanning pages through
-ADF scanners* leads to unavoidable skew rates (sometimes as much as 2.5°).
+_Hough_ finds skew angles in scanned document pages, using the Hough transform.
 
-As such it has no real user interface and is oriented to batch processing
-on Linux or OS X. It can make use of multiple cores, because the
-analysis and image processing is very CPU intensive.
+It is oriented to batch processing, and can make use of multiple cores. (You'll
+want this - analysis and image processing is very CPU intensive!)
 
-#### Input data parameters
+# Installation and usage
 
-I use it with TIFF page images (one page per file),
-as this is convenient on the scanning side, and fits all steps of my
-personal workflow. However, the program should work on various input
-formats, and both grey scale and RGB images.
+## Installation
 
-* If you only have input bilevel bitmaps, things should still work,
-  but the output quality will be less than desired. For best results,
-  it is very important that deskewing is done on grey scale (or RGB) files.
+Eventually, this will be published, so you'll be able to run `pip install hough`.
+It requires Python 3.6.1+ to run.
 
-**Most of the heuristics are tuned for resolutions around 300-600 dpi.**
+For now, you'll need to install [Poetry](https://python-poetry.org/docs/#installation),
+then run:
 
-If you want to see example documents, just about all of
-[these files](http://docs.telegraphics.com.au/) have been deskewed this way.
+```
+poetry install
+poetry shell
+```
 
-**Please note:** This is an inexact process, with many heuristics discovered
-by trial and error, and this software is still being improved.
-It has worked on many thousands of pages of my own material, of varied layouts,
-but may not work well on your material without tuning and modification.
-(See comment below about debugging output.)
+## Usage
 
-### Setting up
+To get started right away on a bunch of TIFF page images, one page per file:
 
-* If you want to actually fix rotations, you will need GraphicsMagick:
-  - `sudo apt-get install graphicsmagick`
-* Check out this repository and change working directory
-  to the top level project directory
-* Create a Python [virtual environment](https://docs.python.org/3/tutorial/venv.html)
-  - `python3 -m venv .venv`
-  - (On Ubuntu you may need to do this first: `sudo apt-get install python3-venv`)
-* Activate it:
-  - `source .venv/bin/activate`
-* Install Python dependencies:
-  - `pip install -r requirements.txt`
+```
+hough --csv *.tif
+```
 
-#### Troubleshooting
+The deskewing results are placed in the `results.csv` file. Example:
 
-* If you see `error: invalid command 'bdist_wheel'`,
-  try (from [this page](https://stackoverflow.com/a/44862371/173515)):
-  - `pip install wheel`
-  - `pip install -r requirements.txt`
+```csv
+"Input File","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"
+"/home/toby/my-pages/orig/a--0000.pgm.tif",-0.07699791151672428,0.001073874144832815,5014,6659
+"/home/toby/my-pages/orig/a--0001.pgm.tif",,,5018,6630
+"/home/toby/my-pages/orig/a--0002.pgm.tif",0.24936351676615068,0.005137031681286154,5021,6629
+"/home/toby/my-pages/orig/a--0003.pgm.tif",,,5020,6608
+"/home/toby/my-pages/orig/a--0004.pgm.tif",-0.037485115754500545,0.025945115897015238,5021,6616
+```
 
-* If you see `ModuleNotFoundError: No module named 'imageio'`,
-  make sure you have activated the venv created during setup:
-  - `source .venv/bin/activate`
+The program should work on various image input formats, and with both grey scale
+and RGB images. _Hough_ works best with images ≥300dpi.
 
-### How can I get skew angles for my pages
+## Command line options
 
-The skew calculator is `skew.py`.
+You can list them by running `hough --help`:
 
-The arguments are a list of input filenames.
+```
+hough - straighten scanned pages using the Hough transform.
 
-You could use `ls | xargs ./skew.py` to provide these names,
-but this will use just one core for processing.
+Usage:
+  hough (-h | --help)
+  hough [options] <file>...
 
-The output is CSV for further use:
+Arguments:
+  file                          Input file(s) to process
 
-    (.venv) toby@w8pc:~/hough$ ls ~/my-pages/orig/* |head -5|xargs ./skew.py 2> /dev/null
-    "/home/toby/my-pages/orig/a--0000.pgm.tif",-0.07699791151672428,0.001073874144832815,5014,6659
-    "/home/toby/my-pages/orig/a--0001.pgm.tif",,,5018,6630
-    "/home/toby/my-pages/orig/a--0002.pgm.tif",0.24936351676615068,0.005137031681286154,5021,6629
-    "/home/toby/my-pages/orig/a--0003.pgm.tif",,,5020,6608
-    "/home/toby/my-pages/orig/a--0004.pgm.tif",-0.037485115754500545,0.025945115897015238,5021,6616
+Options:
+  -h --help                     Display this help and exit
+  -v --verbose                  print status messages
+  -d --debug                    retain debug image output in out/ directory
+                                (also enables --verbose)
+  --version                     Display the version number and exit
+  -c --csv                      Save rotation results in CSV format
+  --results=<file>              Save rotation results to named file.
+                                Extension comes from format (.csv, ...)
+                                [default: results]
+```
 
-The CSV columns are:
-* Full path to input file
-* Computed angle
-* Variance of computed angles (not currently used)
-* Page width in pixels
-* Page height in pixels
+# Examples
 
-#### Debugging output
+Just about all of [these files](http://docs.telegraphics.com.au/) have been
+deskewed this way.
 
-Note that `skew.py` cannot always determine a skew for a page
-(e.g. blank pages in particular), and will very occasionally get the skew wrong
-(depending on source material).
-Therefore it produces debugging images for review, in the `out/` directory
-in the working directory.
-**You should review these files before shipping the final result.
-Or at least, review the auto-rotated pages.**
+# Getting the best results
 
-### Batch skew analysis and rotation
+### NOTE: This is a beta product!
 
-To run a batch job on multiple cores, including both analysis and
-the corrective rotation, use this command:
+There's a few guidelines you should follow to get the best deskewing results
+from your document scans:
 
-    ls /path/to/pages/* | ./distribute.sh
+1. Bilevel (black-and-white) bitmaps will produce lower quality results.
+   For best results, scan to greyscale or RGB first, deskew with Hough, then
+   reduce the colour depth to bilevel.
+1. Hough deskewing is an inexact process, with many heuristics discovered
+   by trial and error. _Hough_ may not work well on your material without tuning
+   and further modification. (We'd love your pull requests!)
 
-(The number of concurrent cores is defined in that script.
-I have an 8 core machine, so I typically use six.)
+## Debugging output
 
-Output, file per page, is to the `process/` directory in the current
-working directory (which can be a symlink to somewhere else).
-The input files are left unchanged.
+You can spy on _Hough_'s attempts to perform deskewing by passing the `--debug`
+flag on the command line. The generated images, and any detected lines in them,
+are placed in the `out/<datetime>/` directory.
 
+Note that _Hough_ cannot always determine a skew for a page (e.g. blank pages
+in particular), and will very occasionally get the skew wrong (depending on
+source material). It's worth reviewing these images if _Hough_ makes a bad
+decision on your scans.
 
-`*` - I use a **Fujitsu fi-4530C, USB model,** which is fast, high quality,
-and cheaply available on ebay if you can deal with
-its Windows XP driver (VirtualBox works). I've done thousands of pages
-with mine.
+## Recommended scanners
 
+The authors have tested this software with output from the following scanners:
 
+* Fujitsu fi-4530C, USB
+  * Fast
+  * Cheap on eBay
+  * Requires a Windows XP VirtualBox for drivers
+* Brother ADS-2700W, USB + Ethernet + WiFi
+  * Fast
+  * Can scan directly to the network or to a memory stick
+  * Factory reconditioned models stilll available (March 2020)
+  * Very low skew out of the box
+* Epson WF-7610, USB + Ethernet + WiFi
+  * 11"x17" and duplex capable
+  * Can scan directly to the network or to a memory stick
 
-    This file is part of "hough", which detects skew angles in scanned images
-    Copyright (C) 2016-2020 Toby Thain, toby@telegraphics.com.au
+## License notice
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
+```
+This file is part of "hough", which detects skew angles in scanned images
+Copyright (C) 2016-2020 Toby Thain, toby@telegraphics.com.au
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
 
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+```

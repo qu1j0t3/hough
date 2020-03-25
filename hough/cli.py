@@ -21,10 +21,11 @@
 """hough - straighten scanned pages using the Hough transform.
 
 Usage:
+  hough (-h | --help)
   hough [options] <file>...
 
 Arguments:
-  file                   Input file(s) to process
+  file                          Input file(s) to process
 
 Options:
   -h --help                     Display this help and exit
@@ -44,7 +45,7 @@ import logging.config
 import logging.handlers
 import os
 import threading
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
 
 import numpy as np
 from docopt import docopt
@@ -57,6 +58,7 @@ from skimage.filters import threshold_otsu
 from skimage.morphology import binary_dilation
 from skimage.transform import downscale_local_mean, probabilistic_hough_line
 from skimage.util import crop
+
 
 VERSION = "hough 0.2"
 WINDOW_SIZE = 150
@@ -137,8 +139,8 @@ def hough_angles(pos, neg, orientation="row"):
     return (angles, sums[line], edges_grey)
 
 
-if __name__ == "__main__":
-    arguments = docopt(version=VERSION, more_magic=True)
+def run():
+    arguments = docopt(__doc__, version=VERSION, more_magic=True)
 
     if arguments.debug:
         arguments["verbose"] = True
@@ -148,6 +150,7 @@ if __name__ == "__main__":
     else:
         log_level = logging.WARNING
     results_file = arguments.results + ".csv"
+    no_results_file = not os.path.isfile(results_file)
     arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
 
     logq = Queue()
@@ -185,14 +188,14 @@ if __name__ == "__main__":
     logging.config.dictConfig(logd)
     lp = threading.Thread(target=logger_thread, args=(logq,))
     lp.start()
-    logger = logging.getLogger("hough")
-    logger.info(f"=== Run started @ {arguments.now} ===")
     if arguments.csv:
         logger_csv = logging.getLogger("csv")
-        if not os.path.isfile(results_file):
+        if no_results_file:
             logger_csv.info(
                 '"Input File","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
             )
+    logger = logging.getLogger("hough")
+    logger.info(f"=== Run started @ {arguments.now} ===")
 
     if arguments.debug and not os.path.isdir(f"out/{arguments.now}"):
         os.makedirs(f"out/{arguments.now}")
@@ -259,9 +262,9 @@ if __name__ == "__main__":
             for ((x_0, y_0), (x_1, y_1)) in lines:
                 if abs(x_1 - x_0) > abs(y_1 - y_0):
                     # angle is <= π/4 from horizontal or vertical
-                    dir, x0, y0, x1, y1 = "H", x_0, y_0, x_1, y_1
+                    _, x0, y0, x1, y1 = "H", x_0, y_0, x_1, y_1
                 else:
-                    dir, x0, y0, x1, y1 = "V", y_0, -x_0, y_1, -x_1
+                    _, x0, y0, x1, y1 = "V", y_0, -x_0, y_1, -x_1
                 # flip angle so that X delta is positive (East quadrants).
                 k = 1 if x1 > x0 else -1
                 a = np.rad2deg(np.math.atan2(k * (y1 - y0), k * (x1 - x0)))
@@ -309,3 +312,7 @@ if __name__ == "__main__":
     lp.join()
 
     logger.info(f"=== Run ended @ {datetime.datetime.utcnow().isoformat()} ===")
+
+
+if __name__ == "__main__":
+    run()
