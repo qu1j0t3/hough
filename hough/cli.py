@@ -37,6 +37,8 @@ Options:
   --results=<file>              Save rotation results to named file.
                                 Extension comes from format (.csv, ...)
                                 [default: results]
+  --histogram                   Display rotation angle histogram summary
+                                (implies --csv)
   -j <jobs> --jobs=<jobs>       Specify the number of jobs to run
                                 simultaneously. Default: total # of CPUs
 """
@@ -54,6 +56,7 @@ from docopt import docopt
 import hough
 
 from . import process
+from .stats import histogram
 
 
 def logger_thread(q):
@@ -117,6 +120,8 @@ def run():
     logging.config.dictConfig(logd)
     lp = threading.Thread(target=logger_thread, args=(logq,))
     lp.start()
+    if arguments.histogram:
+        arguments["csv"] = True
     if arguments.csv:
         logger_csv = logging.getLogger("csv")
         if not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
@@ -145,6 +150,9 @@ def run():
             res = x.get()
             if arguments.debug:
                 logger.debug(res)
+        if arguments.histogram:
+            histogram(results_file)
+
     except KeyboardInterrupt:
         pool.terminate()
         pool.join()

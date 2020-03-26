@@ -150,6 +150,18 @@ pycodestyle = ">=2.5.0,<2.6.0"
 pyflakes = ">=2.1.0,<2.2.0"
 
 [[package]]
+category = "main"
+description = "Gnuplot-based plotting for numpy"
+name = "gnuplotlib"
+optional = false
+python-versions = "*"
+version = "0.33"
+
+[package.dependencies]
+numpy = "*"
+numpysane = ">=0.3"
+
+[[package]]
 category = "dev"
 description = "File identification library for Python"
 name = "identify"
@@ -311,6 +323,14 @@ name = "numpy"
 optional = false
 python-versions = ">=3.5"
 version = "1.18.2"
+
+[[package]]
+category = "main"
+description = "more-reasonable core functionality for numpy"
+name = "numpysane"
+optional = false
+python-versions = "*"
+version = "0.22"
 
 [[package]]
 category = "dev"
@@ -538,6 +558,14 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 version = "1.14.0"
 
 [[package]]
+category = "main"
+description = "Plotting on the command line"
+name = "termplotlib"
+optional = false
+python-versions = ">=3.5"
+version = "0.2.4"
+
+[[package]]
 category = "dev"
 description = "Python Library for Tom's Obvious, Minimal Language"
 name = "toml"
@@ -619,7 +647,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "384ee54d0b0b9cfee2912940a025b17cce79dce18b68938db5896dfd1a2eb8e6"
+content-hash = "ae6a8e9f477a52837ff902a19cad18d9f1f1d168770b62e9a31dbd594ff6856f"
 python-versions = "^3.6.1"
 
 [metadata.files]
@@ -710,6 +738,9 @@ filelock = [
 flake8 = [
     {file = "flake8-3.7.9-py2.py3-none-any.whl", hash = "sha256:49356e766643ad15072a789a20915d3c91dc89fd313ccd71802303fd67e4deca"},
     {file = "flake8-3.7.9.tar.gz", hash = "sha256:45681a117ecc81e870cbf1262835ae4af5e7a8b08e40b944a8a6e6b895914cfb"},
+]
+gnuplotlib = [
+    {file = "gnuplotlib-0.33.tar.gz", hash = "sha256:6b47473aa2ba8e7d0f22b558620854e056494d9a04456b2a744fe88a90cb4465"},
 ]
 identify = [
     {file = "identify-1.4.13-py2.py3-none-any.whl", hash = "sha256:a7577a1f55cee1d21953a5cf11a3c839ab87f5ef909a4cba6cf52ed72b4c6059"},
@@ -823,6 +854,9 @@ numpy = [
     {file = "numpy-1.18.2-cp38-cp38-win32.whl", hash = "sha256:5e0feb76849ca3e83dd396254e47c7dba65b3fa9ed3df67c2556293ae3e16de3"},
     {file = "numpy-1.18.2-cp38-cp38-win_amd64.whl", hash = "sha256:ba3c7a2814ec8a176bb71f91478293d633c08582119e713a0c5351c0f77698da"},
     {file = "numpy-1.18.2.zip", hash = "sha256:e7894793e6e8540dbeac77c87b489e331947813511108ae097f1715c018b8f3d"},
+]
+numpysane = [
+    {file = "numpysane-0.22.tar.gz", hash = "sha256:c538ccd805f3013cded0096276485271037834f6bbbe87df6f5276bdfa89bbca"},
 ]
 packaging = [
     {file = "packaging-20.3-py2.py3-none-any.whl", hash = "sha256:82f77b9bee21c1bafbf35a84905d604d5d1223801d639cf3ed140bd651c08752"},
@@ -998,6 +1032,10 @@ scipy = [
 six = [
     {file = "six-1.14.0-py2.py3-none-any.whl", hash = "sha256:8f3cd2e254d8f793e7f3d6d9df77b92252b52637291d0f0da013c76ea2724b6c"},
     {file = "six-1.14.0.tar.gz", hash = "sha256:236bdbdce46e6e6a3d61a337c0f8b763ca1e8717c03b369e87a7ec7ce1319c0a"},
+]
+termplotlib = [
+    {file = "termplotlib-0.2.4-py3-none-any.whl", hash = "sha256:8caf1b9984491c74e3429d057519c7ac91bb4bfa4517a03c04ac7692d2c90aa2"},
+    {file = "termplotlib-0.2.4.tar.gz", hash = "sha256:e9244aca8f8d13118aea43565a56d5c8c82f6df6d2c254b473688e1410416c5f"},
 ]
 toml = [
     {file = "toml-0.10.0-py2.7.egg", hash = "sha256:f1db651f9657708513243e61e6cc67d101a39bad662eaa9b5546f789338e07a3"},

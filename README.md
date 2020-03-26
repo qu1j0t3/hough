@@ -72,6 +72,10 @@ Options:
   --results=<file>              Save rotation results to named file.
                                 Extension comes from format (.csv, ...)
                                 [default: results]
+  --histogram                   Display rotation angle histogram summary
+                                (implies --csv)
+  -j <jobs> --jobs=<jobs>       Specify the number of jobs to run
+                                simultaneously. Default: total # of CPUs
 ```
 
 # Examples
