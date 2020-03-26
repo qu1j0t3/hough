@@ -1,53 +1,114 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Python CI
+name: Tests
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [push, pull_request]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  Linting:
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+      - name: Linting
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files
+
+  Linux:
+    needs: Linting
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+
+    steps:
     - uses: actions/checkout@v2
-    - name: Set up Python
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
       with:
-        python-version: '3.x'
-    - name: Cache pip
+        python-version: ${{ matrix.python-version }}
+    - name: Get full python version
+      id: full-python-version
+      run: |
+        echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+    - name: Install Poetry
+      uses: dschep/install-poetry-action@v1.2
+    - name: Set up cache
       uses: actions/cache@v1
       with:
-        path: ~/.cache/pip # This path is specific to Ubuntu
-        # Look to see if there is a cache hit for the corresponding requirements file
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          ${{ runner.os }}-
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+    - name: Install dependencies
+      run: poetry install
+    - name: Test
+      run: poetry run pytest -q tests
+
+  MacOS:
+    needs: Linting
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Get full python version
+      id: full-python-version
+      run: |
+        echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+    - name: Install Poetry
+      uses: dschep/install-poetry-action@v1.2
+    - name: Set up cache
+      uses: actions/cache@v1
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+    - name: Install dependencies
+      run: poetry install
+    - name: Test
+      run: poetry run pytest -q tests
+
+  Windows:
+    needs: Linting
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Get full python version
+      id: full-python-version
+      shell: bash
+      run: |
+        echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+    - name: Install Poetry
+      uses: dschep/install-poetry-action@v1.2
+    - name: Set up cache
+      uses: actions/cache@v1
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-    - name: Python style check
+        $env:Path += ";$env:Userprofile\.poetry\bin"
+        poetry install
+    - name: Test
       run: |
-        isort --version-number
-        isort --check-only --diff --quiet
-        black --version
-        black --check --exclude '/(\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|_build|buck-out|build|dist|node_modules)/' .
-        flake8 --version
-        flake8 --ignore E501,W503 --exclude .venv
-  # - name: Test with pytest
-  #   run: |
-  #     pip install pytest
-  #     pip install pytest-cov
-  #     pytest tests.py --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+        $env:Path += ";$env:Userprofile\.poetry\bin"
+        poetry run pytest -q tests
