@@ -37,6 +37,8 @@ Options:
   --results=<file>              Save rotation results to named file.
                                 Extension comes from format (.csv, ...)
                                 [default: results]
+  -j <jobs> --jobs=<jobs>       Specify the number of jobs to run
+                                simultaneously. Default: total # of CPUs
 """
 
 import datetime
@@ -128,15 +130,24 @@ def run():
         os.makedirs(f"out/{arguments.now}")
 
     # the pool that launched 1,000 Houghs...
-    pool = Pool(
-        cpu_count(), initializer=process._init_worker, initargs=(logq, arguments,)
-    )
-    results = []
-    for f in arguments.file:
-        results.append(pool.apply_async(process.process_image, (f,)))
-    pool.close()
-    for x in results:
-        x.get()
+    if arguments.jobs:
+        jobs = int(arguments.jobs)
+    else:
+        jobs = cpu_count()
+
+    try:
+        pool = Pool(jobs, initializer=process._init_worker, initargs=(logq, arguments,))
+        results = []
+        for f in arguments.file:
+            results.append(pool.apply_async(process.process_image, (f,)))
+        pool.close()
+        for x in results:
+            res = x.get()
+            if arguments.debug:
+                logger.debug(res)
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
 
     # end logging thread
     logq.put(None)

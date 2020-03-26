@@ -3,6 +3,7 @@ Worker functions for a parallelizable deskewer.
 """
 import logging
 import os
+import signal
 
 import numpy as np
 from imageio import imread, imwrite
@@ -91,6 +92,8 @@ def hough_angles(pos, neg, orientation="row"):
 
 
 def _init_worker(q, args):
+    # Ignore CTRL+C in the workers, see http://jessenoller.com/blog/2009/01/08/multiprocessingpool-and-keyboardinterrupt
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     qh = logging.handlers.QueueHandler(q)
     root = logging.getLogger()
     root.addHandler(qh)
