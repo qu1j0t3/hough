@@ -22,6 +22,7 @@ For now, you'll need to install [Poetry](https://python-poetry.org/docs/#install
 then run:
 
 ```
+poetry run pip install -U pip setuptools
 poetry install
 poetry shell
 ```

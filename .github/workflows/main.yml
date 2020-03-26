@@ -41,6 +41,9 @@ jobs:
       id: full-python-version
       run: |
         echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+    - name: Update pip
+      run: |
+        poetry run pip install -U pip setuptools
     - name: Install Poetry
       uses: dschep/install-poetry-action@v1.2
     - name: Set up cache
@@ -70,6 +73,9 @@ jobs:
       id: full-python-version
       run: |
         echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+    - name: Update pip
+      run: |
+        poetry run pip install -U pip setuptools
     - name: Install Poetry
       uses: dschep/install-poetry-action@v1.2
     - name: Set up cache
@@ -100,6 +106,9 @@ jobs:
       shell: bash
       run: |
         echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+    - name: Update pip
+      run: |
+        poetry run pip install -U pip setuptools
     - name: Install Poetry
       uses: dschep/install-poetry-action@v1.2
     - name: Set up cache
