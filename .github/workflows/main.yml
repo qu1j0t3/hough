@@ -48,7 +48,19 @@ jobs:
     - name: Install dependencies
       run: poetry install
     - name: Test
-      run: poetry run pytest -q tests
+      run: |
+        poetry run pytest -q tests
+        poetry run coveralls
+    - name: Coveralls Parallel
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel: true
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
 
   MacOS:
     needs: Linting
@@ -77,7 +89,19 @@ jobs:
     - name: Install dependencies
       run: poetry install
     - name: Test
-      run: poetry run pytest -q tests
+      run: |
+        poetry run pytest -q tests
+        coveralls
+    - name: Coveralls Parallel
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel: true
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
 
   Windows:
     needs: Linting
@@ -112,3 +136,14 @@ jobs:
       run: |
         $env:Path += ";$env:Userprofile\.poetry\bin"
         poetry run pytest -q tests
+        poetry run coveralls
+    - name: Coveralls Parallel
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel: true
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
