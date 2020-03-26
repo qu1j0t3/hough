@@ -1,5 +1,11 @@
 # hough - Skew detection in scanned images
 
+<p align="center">
+<a href="https://github.com/wohali/hough/actions"><img alt="Actions Status" src="https://github.com/wohali/hough/workflows/Tests/badge.svg"></a>
+<a href="https://github.com/wohali/hough/blob/master/COPYING"><img src="https://img.shields.io/github/license/wohali/hough.svg" alt="GitHub license" /></a>
+<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+</p>
+
 _Hough_ finds skew angles in scanned document pages, using the Hough transform.
 
 It is oriented to batch processing, and can make use of multiple cores. (You'll
