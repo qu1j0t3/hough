@@ -32,11 +32,26 @@ The first line is required to update `pip` to a new enough version to be compati
 
 ## Usage
 
-To get started right away on a bunch of TIFF page images, one page per file:
+To get started right away, here's some examples.
+
+Generate angles (in CSV form) for a bunch of TIFF page images, one page per file:
 
 ```
-hough --csv *.tif
+hough --csv in/*.tif
 ```
+
+The same, but for a PDF file, and display a histogram at the end:
+
+```
+hough --histogram Able_Attach_Sep83.pdf
+```
+
+The same, but show progress while running:
+
+```
+hough -v --histogram Able_Attach_Sep83.pdf
+```
+
 
 The deskewing results are placed in the `results.csv` file. Example:
 
@@ -51,6 +66,36 @@ The deskewing results are placed in the `results.csv` file. Example:
 
 The program should work on various image input formats, and with both grey scale
 and RGB images. _Hough_ works best with images ≥300dpi.
+
+Here's a histogram sample:
+
+```
+=== Skew statistics ===
+0.00° - 0.10°  [57]  ████████████████████████████████████████
+0.10° - 0.20°  [39]  ███████████████████████████▍
+0.20° - 0.30°  [30]  █████████████████████
+0.30° - 0.40°  [30]  █████████████████████
+0.40° - 0.50°  [11]  ███████▊
+0.50° - 0.60°  [11]  ███████▊
+0.60° - 0.70°  [ 3]  ██▏
+0.70° - 0.80°  [ 4]  ██▊
+0.80° - 0.90°  [ 0]
+0.90° - 1.00°  [ 1]  ▊
+1.00° - 1.10°  [ 1]  ▊
+1.10° - 1.20°  [ 0]
+1.20° - 1.30°  [ 1]  ▊
+1.30° - 1.40°  [ 1]  ▊
+1.40° - 1.50°  [ 1]  ▊
+1.50° - 1.60°  [ 2]  █▍
+1.60° - 1.70°  [ 0]
+1.70° - 1.80°  [ 1]  ▊
+1.80° - 1.90°  [ 2]  █▍
+1.90° - 2.00°  [ 0]
+Samples: 195
+50th percentile: 0.20°
+90th percentile: 0.55°
+99th percentile: 1.77°
+```
 
 ## Command line options
 

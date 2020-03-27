@@ -109,19 +109,19 @@ def process_page(f, page, mimetype):
         doc = fitz.open(f)
         imagelist = doc.getPageImageList(page)
         if len(imagelist) == 1:
-            logger.info(f"Processing {f} - page {page} - {len(imagelist)} image...")
+            logger.info(f"Processing {f} - page {page+1} - {len(imagelist)} image...")
         else:
-            logger.info(f"Processing {f} - page {page} - {len(imagelist)} images...")
+            logger.info(f"Processing {f} - page {page+1} - {len(imagelist)} images...")
         for item in imagelist:
             xref = item[0]
             smask = item[1]
             if smask == 0:
                 imgdict = doc.extractImage(xref)
                 image = imread(imgdict["image"])
-                process_image(f, image, logger, pagenum=page)
+                process_image(f, image, logger, pagenum=(page + 1))
             else:
                 logger.error(
-                    f"Cannot process {f} - page {page} - image {xref} - smask=={smask}"
+                    f"Cannot process {f} - page {page+1} - image {xref} - smask=={smask}"
                 )
     else:
         # TODO: support multi-image TIFF with
