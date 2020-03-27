@@ -51,6 +51,8 @@ import os
 import threading
 from multiprocessing import Pool, Queue, cpu_count
 
+import filetype
+import fitz
 from docopt import docopt
 
 import hough
@@ -59,11 +61,12 @@ from . import process
 from .stats import histogram
 
 
-def logger_thread(q):
+def _logger_thread(q):
     while True:
         record = q.get()
         if record is None:
             break
+        # this avoids double-logging
         if record.name == "worker_csv":
             record.name = "csv"
         elif record.name == "worker_hough":
@@ -72,19 +75,7 @@ def logger_thread(q):
         logger.handle(record)
 
 
-def run():
-    arguments = docopt(__doc__, version=hough.__version__, more_magic=True)
-
-    if arguments.debug:
-        arguments["verbose"] = True
-        log_level = logging.DEBUG
-    elif arguments.verbose:
-        log_level = logging.INFO
-    else:
-        log_level = logging.WARNING
-    results_file = arguments.results + ".csv"
-    arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
-
+def _setup_logging(log_level, results_file):
     logq = Queue()
     logd = {
         "version": 1,
@@ -118,33 +109,58 @@ def run():
         "root": {"level": logging.DEBUG, "handlers": []},
     }
     logging.config.dictConfig(logd)
-    lp = threading.Thread(target=logger_thread, args=(logq,))
+    lp = threading.Thread(target=_logger_thread, args=(logq,))
     lp.start()
+    return logq, lp
+
+
+def run():
+    arguments = docopt(__doc__, version=hough.__version__, more_magic=True)
+
+    if arguments.debug:
+        arguments["verbose"] = True
+        log_level = logging.DEBUG
+    elif arguments.verbose:
+        log_level = logging.INFO
+    else:
+        log_level = logging.WARNING
+    results_file = arguments.results + ".csv"
+    arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
     if arguments.histogram:
         arguments["csv"] = True
-    if arguments.csv:
-        logger_csv = logging.getLogger("csv")
-        if not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
-            logger_csv.info(
-                '"Input File","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
-            )
-    logger = logging.getLogger("hough")
-    logger.info(f"=== Run started @ {arguments.now} ===")
-
-    if arguments.debug and not os.path.isdir(f"out/{arguments.now}"):
-        os.makedirs(f"out/{arguments.now}")
-
-    # the pool that launched 1,000 Houghs...
     if arguments.jobs:
         jobs = int(arguments.jobs)
     else:
         jobs = cpu_count()
 
+    logq, lp = _setup_logging(log_level, results_file)
+    logger = logging.getLogger("hough")
+    logger.info(f"=== Run started @ {arguments.now} ===")
+    if arguments.csv:
+        logger_csv = logging.getLogger("csv")
+        if not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
+            logger_csv.info(
+                '"Input File","Page Number","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
+            )
+
+    if arguments.debug and not os.path.isdir(f"out/{arguments.now}"):
+        os.makedirs(f"out/{arguments.now}")
+
+    # the pool that launched 1,000 Houghs...
     try:
         pool = Pool(jobs, initializer=process._init_worker, initargs=(logq, arguments,))
         results = []
         for f in arguments.file:
-            results.append(pool.apply_async(process.process_image, (f,)))
+            kind = filetype.guess(f)
+            # TODO: Handle multi-page TIFFs here as well
+            if kind.mime == "application/pdf":
+                pdf = fitz.open(f)
+                for page in range(len(pdf)):
+                    results.append(
+                        pool.apply_async(process.process_page, (f, page, kind.mime))
+                    )
+            else:
+                results.append(pool.apply_async(process.process_file, (f,)))
         pool.close()
         for x in results:
             res = x.get()

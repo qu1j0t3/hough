@@ -27,6 +27,9 @@ poetry install
 poetry shell
 ```
 
+The first line is required to update `pip` to a new enough version to be compatible with
+`manylinux` wheel packaging, required for PyMuPDF.
+
 ## Usage
 
 To get started right away on a bunch of TIFF page images, one page per file:

@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 
+import fitz
 import numpy as np
 from imageio import imread, imwrite
 from skimage.color import rgb2gray
@@ -97,18 +98,49 @@ def _init_worker(q, args):
     qh = logging.handlers.QueueHandler(q)
     root = logging.getLogger()
     root.addHandler(qh)
+    # this is a global only within the multiprocessing Pool workers, not in the main process.
     global arguments
     arguments = args
 
 
-def process_image(f):
-    global arguments
+def process_page(f, page, mimetype):
     logger = logging.getLogger("worker_hough")
+    if mimetype == "application/pdf":
+        doc = fitz.open(f)
+        imagelist = doc.getPageImageList(page)
+        if len(imagelist) == 1:
+            logger.info(f"Processing {f} - page {page} - {len(imagelist)} image...")
+        else:
+            logger.info(f"Processing {f} - page {page} - {len(imagelist)} images...")
+        for item in imagelist:
+            xref = item[0]
+            smask = item[1]
+            if smask == 0:
+                imgdict = doc.extractImage(xref)
+                image = imread(imgdict["image"])
+                process_image(f, image, logger, pagenum=page)
+            else:
+                logger.error(
+                    f"Cannot process {f} - page {page} - image {xref} - smask=={smask}"
+                )
+    else:
+        # TODO: support multi-image TIFF with
+        #   https://imageio.readthedocs.io/en/stable/userapi.html#imageio.mimread
+        logger.error(f"Cannot process {f}: unknown file format")
+
+
+def process_file(f):
+    logger = logging.getLogger("worker_hough")
+    logger.info(f"Processing {f}")
+    image = imread(f)
+    process_image(f, image, logger)
+
+
+def process_image(f, page, logger, pagenum=""):
+    global arguments
     if arguments.csv:
         logger_csv = logging.getLogger("worker_csv")
-    logger.info(f"Processing {f}")
     filename = os.path.basename(f)
-    page = imread(f)
 
     if page.ndim > 2:
         logger.debug(f"{f} is multichannel - converting to grayscale")
@@ -201,8 +233,13 @@ def process_image(f):
 
     if arguments.csv:
         logger_csv.info(
-            '"{}",{},{},{},{}'.format(
-                f, angle or "", np.var(angles) if angles else "", pagew, pageh
+            '"{}",{},{},{},{},{}'.format(
+                f,
+                int(pagenum) or "",
+                angle or "",
+                np.var(angles) if angles else "",
+                pagew,
+                pageh,
             )
         )
 

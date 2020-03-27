@@ -16,6 +16,9 @@ numpy = "^1.18.2"
 scikit-image = "^0.16.2"
 scipy = "^1.4.1"
 termplotlib = "^0.2.4"
+pip = "20.0.2"
+pymupdf = "^1.16.14"
+filetype = "^1.0.6"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
@@ -32,7 +35,7 @@ tox = "^3.14.6"
 hough = 'hough.cli:run'
 
 [tool.isort]
-known_third_party = ["docopt", "imageio", "numpy", "skimage", "termplotlib"]
+known_third_party = ["docopt", "filetype", "fitz", "imageio", "numpy", "skimage", "termplotlib"]
 multi_line_output = 3
 lines_after_imports = 2
 force_grid_wrap = 0
