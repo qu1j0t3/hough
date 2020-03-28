@@ -54,6 +54,8 @@ jobs:
         poetry install
     - name: Test
       run: poetry run pytest -q tests
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
 
   MacOS:
     needs: Linting
@@ -85,6 +87,8 @@ jobs:
         poetry install
     - name: Test
       run: poetry run pytest -q tests
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
 
   Windows:
     needs: Linting
@@ -120,3 +124,5 @@ jobs:
       run: |
         $env:Path += ";$env:Userprofile\.poetry\bin"
         poetry run pytest -q tests
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1

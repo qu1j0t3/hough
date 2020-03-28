@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 
+import filetype
 import fitz
 import numpy as np
 from imageio import imread, imwrite
@@ -103,9 +104,27 @@ def _init_worker(q, args):
     arguments = args
 
 
-def process_page(f, page, mimetype):
+def get_pages(f):
+    """Returns the pages in the file, as a list of tuples of the form:
+        [(filename, "mime/type", pagenum), ... ]
+    """
+    kind = filetype.guess(f)
+    if kind.mime == "application/pdf":
+        pdf = fitz.open(f)
+        return [(f, kind.mime, x) for x in range(len(pdf))]
+    # TODO: Add support for multi-page TIFFs here via
+    #   https://imageio.readthedocs.io/en/stable/userapi.html#imageio.mimread
+    else:
+        return [(f, kind.mime, None)]
+
+
+def process_page(tuple):
+    f, mimetype, page = tuple
     logger = logging.getLogger("worker_hough")
-    if mimetype == "application/pdf":
+    if not page:
+        image = imread(f)
+        process_image(f, image, logger)
+    elif mimetype == "application/pdf":
         doc = fitz.open(f)
         imagelist = doc.getPageImageList(page)
         if len(imagelist) == 1:
@@ -121,7 +140,7 @@ def process_page(f, page, mimetype):
                 process_image(f, image, logger, pagenum=(page + 1))
             else:
                 logger.error(
-                    f"Cannot process {f} - page {page+1} - image {xref} - smask=={smask}"
+                    f"Skipping process {f} - page {page+1} - image {xref} (smask=={smask})"
                 )
     else:
         # TODO: support multi-image TIFF with
@@ -132,8 +151,8 @@ def process_page(f, page, mimetype):
 def process_file(f):
     logger = logging.getLogger("worker_hough")
     logger.info(f"Processing {f}")
-    image = imread(f)
-    process_image(f, image, logger)
+    for page in get_pages(f):
+        process_page(page)
 
 
 def process_image(f, page, logger, pagenum=""):

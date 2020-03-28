@@ -39,7 +39,7 @@ Options:
                                 [default: results]
   --histogram                   Display rotation angle histogram summary
                                 (implies --csv)
-  -j <jobs> --jobs=<jobs>       Specify the number of jobs to run
+  -w <workers> --workers=<#>    Specify the number of workers to run
                                 simultaneously. Default: total # of CPUs
 """
 
@@ -49,11 +49,11 @@ import logging.config
 import logging.handlers
 import os
 import threading
-from multiprocessing import Pool, Queue, cpu_count
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import Manager, cpu_count, freeze_support
 
-import filetype
-import fitz
 from docopt import docopt
+from tqdm import tqdm
 
 import hough
 
@@ -76,7 +76,7 @@ def _logger_thread(q):
 
 
 def _setup_logging(log_level, results_file):
-    logq = Queue()
+    logq = Manager().Queue(-1)
     logd = {
         "version": 1,
         "formatters": {
@@ -128,10 +128,11 @@ def run():
     arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
     if arguments.histogram:
         arguments["csv"] = True
-    if arguments.jobs:
-        jobs = int(arguments.jobs)
+    if arguments.workers:
+        workers = int(arguments.workers)
     else:
-        jobs = cpu_count()
+        workers = cpu_count()
+    pbar_disable = arguments.quiet or arguments.verbose or arguments.debug
 
     logq, lp = _setup_logging(log_level, results_file)
     logger = logging.getLogger("hough")
@@ -147,31 +148,28 @@ def run():
         os.makedirs(f"out/{arguments.now}")
 
     # the pool that launched 1,000 Houghs...
-    try:
-        pool = Pool(jobs, initializer=process._init_worker, initargs=(logq, arguments,))
-        results = []
-        for f in arguments.file:
-            kind = filetype.guess(f)
-            # TODO: Handle multi-page TIFFs here as well
-            if kind.mime == "application/pdf":
-                pdf = fitz.open(f)
-                for page in range(len(pdf)):
-                    results.append(
-                        pool.apply_async(process.process_page, (f, page, kind.mime))
-                    )
-            else:
-                results.append(pool.apply_async(process.process_file, (f,)))
-        pool.close()
-        for x in results:
-            res = x.get()
-            if arguments.debug:
-                logger.debug(res)
-        if arguments.histogram:
-            histogram(results_file)
+    pages = []
+    for f in arguments.file:
+        pages += process.get_pages(f)
 
-    except KeyboardInterrupt:
-        pool.terminate()
-        pool.join()
+    # we do it this way, not with a map, until https://github.com/tqdm/tqdm/issues/548 is fixed
+    results = []
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=process._init_worker,
+        initargs=(logq, arguments,),
+    ) as executor:
+        jobs = [executor.submit(process.process_page, page) for page in pages]
+        for job in tqdm(as_completed(jobs), total=len(jobs), disable=pbar_disable):
+            try:
+                results.append(job.result())
+            except StopIteration:
+                break
+            except Exception as e:
+                logger.debug(e)
+
+    if arguments.histogram:
+        histogram(results_file)
 
     # end logging thread
     logq.put(None)
@@ -182,4 +180,5 @@ def run():
 
 
 if __name__ == "__main__":
+    freeze_support()
     run()
