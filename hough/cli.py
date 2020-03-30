@@ -30,7 +30,7 @@ Arguments:
 Options:
   -h --help                     Display this help and exit
   -v --verbose                  print status messages
-  -d --debug                    retain debug image output in out/ directory
+  -d --debug                    retain debug image output in debug/ directory
                                 (also enables --verbose)
   --version                     Display the version number and exit
   -c --csv                      Save rotation results in CSV format
@@ -45,77 +45,47 @@ Options:
 
 import datetime
 import logging
-import logging.config
-import logging.handlers
 import os
-import threading
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import Manager, cpu_count, freeze_support
+import sys
+import time
+from multiprocessing import Pool, cpu_count, freeze_support
 
 from docopt import docopt
 from tqdm import tqdm
 
 import hough
 
-from . import process
+from . import log_utils, process
 from .stats import histogram
 
 
-def _logger_thread(q):
-    while True:
-        record = q.get()
-        if record is None:
-            break
-        # this avoids double-logging
-        if record.name == "worker_csv":
-            record.name = "csv"
-        elif record.name == "worker_hough":
-            record.name = "hough"
-        logger = logging.getLogger(record.name)
-        logger.handle(record)
+def _abort(pool=None, log_queue=None, listener=None):
+    try:
+        if pool:
+            pool.close()
+            pool.terminate()
+            pool.join()
+            # this lets the producers drain their log queues
+            time.sleep(0.1)
+        if log_queue and listener:
+            print(
+                f"=== Run killed @ {datetime.datetime.utcnow().isoformat()} ===",
+                file=sys.stderr,
+            )
+            try:
+                log_queue.put(None)
+                listener.join()
+            except Exception:
+                pass
+    except Exception:
+        import traceback
+
+        print("Exception during abort:", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
 
 
-def _setup_logging(log_level, results_file):
-    logq = Manager().Queue(-1)
-    logd = {
-        "version": 1,
-        "formatters": {
-            "detailed": {
-                "class": "logging.Formatter",
-                "format": "%(asctime)s %(name)-15s %(levelname)-8s %(processName)-10s %(message)s",
-            },
-            "raw": {"class": "logging.Formatter", "format": "%(message)s"},
-        },
-        "handlers": {
-            "console": {"class": "logging.StreamHandler", "level": log_level},
-            "file": {
-                "class": "logging.FileHandler",
-                "filename": "hough.log",
-                "mode": "a",
-                "formatter": "detailed",
-                "level": logging.DEBUG,
-            },
-            "csv": {
-                "class": "logging.FileHandler",
-                "filename": results_file,
-                "mode": "a",
-                "formatter": "raw",
-            },
-        },
-        "loggers": {
-            "csv": {"handlers": ["csv"]},
-            "hough": {"handlers": ["file", "console"]},
-        },
-        "root": {"level": logging.DEBUG, "handlers": []},
-    }
-    logging.config.dictConfig(logd)
-    lp = threading.Thread(target=_logger_thread, args=(logq,))
-    lp.start()
-    return logq, lp
-
-
-def run():
-    arguments = docopt(__doc__, version=hough.__version__, more_magic=True)
+def run(argv=sys.argv[1:]):
+    arguments = docopt(__doc__, argv=argv, version=hough.__version__, more_magic=True)
 
     if arguments.debug:
         arguments["verbose"] = True
@@ -134,9 +104,48 @@ def run():
         workers = cpu_count()
     pbar_disable = arguments.quiet or arguments.verbose or arguments.debug
 
-    logq, lp = _setup_logging(log_level, results_file)
-    logger = logging.getLogger("hough")
-    logger.info(f"=== Run started @ {arguments.now} ===")
+    if arguments.debug and not os.path.isdir(f"debug/{arguments.now}"):
+        os.makedirs(f"debug/{arguments.now}")
+
+    logq, listener = log_utils.start_logger_process(log_level, results_file)
+
+    results = []
+
+    # The pool that launched 1,000 Houghs...
+    # We do it this way, not with a map, until https://github.com/tqdm/tqdm/issues/548 is fixed
+    with Pool(
+        processes=workers,
+        initializer=process._init_worker,
+        initargs=(logq, arguments.debug, arguments.now,),
+    ) as p:
+        try:
+            pages = []
+            for f in arguments.file:
+                pages += process.get_pages(f)
+
+            log_utils.setup_queue_logging(logq)
+            logger = logging.getLogger("hough")
+            logger.info(
+                f"=== Run started @ {datetime.datetime.utcnow().isoformat()} ==="
+            )
+
+            with tqdm(total=len(pages), disable=pbar_disable, unit="pg") as pbar:
+                for i, result in enumerate(
+                    p.imap_unordered(process.process_page, pages)
+                ):
+                    pbar.update()
+                    results.append(result)
+            # for result in p.imap_unordered(process.process_page, pages):
+            #    results.append(result)
+            p.close()
+            p.join()
+        except KeyboardInterrupt:
+            import sys
+
+            print("Caught KeyboardInterrupt, terminating workers...", file=sys.stderr)
+            _abort(p, logq, listener)
+            return -1
+
     if arguments.csv:
         logger_csv = logging.getLogger("csv")
         if not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
@@ -144,41 +153,36 @@ def run():
                 '"Input File","Page Number","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
             )
 
-    if arguments.debug and not os.path.isdir(f"out/{arguments.now}"):
-        os.makedirs(f"out/{arguments.now}")
-
-    # the pool that launched 1,000 Houghs...
-    pages = []
-    for f in arguments.file:
-        pages += process.get_pages(f)
-
-    # we do it this way, not with a map, until https://github.com/tqdm/tqdm/issues/548 is fixed
-    results = []
-    with ProcessPoolExecutor(
-        max_workers=workers,
-        initializer=process._init_worker,
-        initargs=(logq, arguments,),
-    ) as executor:
-        jobs = [executor.submit(process.process_page, page) for page in pages]
-        for job in tqdm(as_completed(jobs), total=len(jobs), disable=pbar_disable):
-            try:
-                results.append(job.result())
-            except StopIteration:
-                break
-            except Exception as e:
-                logger.debug(e)
+    for result in results:
+        for image in result:
+            (fname, pagenum, angle, variance, pagew, pageh) = image
+            if arguments.csv:
+                logger_csv.info(
+                    '"{}",{},{},{},{},{}'.format(
+                        fname, pagenum, angle, variance, pagew, pageh,
+                    )
+                )
 
     if arguments.histogram:
-        histogram(results_file)
+        try:
+            histogram(results)
+        except Exception:
+            import sys
+            import traceback
 
-    # end logging thread
-    logq.put(None)
-    lp.join()
+            logger.error(f"Exception in histogram process: \n{traceback.format_exc()}")
+            _abort(None, logq, listener)
+            return -1
 
     logger.info(f"=== Run ended @ {datetime.datetime.utcnow().isoformat()} ===")
-    exit(0)
+
+    # end logging process
+    logq.put(None)
+    listener.join()
+
+    return 0
 
 
 if __name__ == "__main__":
     freeze_support()
-    run()
+    exit(run())

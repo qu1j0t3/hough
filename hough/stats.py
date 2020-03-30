@@ -1,17 +1,18 @@
-import csv
 import math
 
 import numpy as np
 import termplotlib as tpl
 
 
-def histogram(results_file):
-    with open("results.csv", newline="") as csvfile:
-        reader = csv.DictReader(csvfile)
-        res = []
-        for row in reader:
-            if row["Computed angle"]:
-                res.append(abs(float(row["Computed angle"])))
+def histogram(results):
+    res = []
+    for result in results:
+        for image in result:
+            if type(image[2]) is not str:
+                res.append(abs(float(image[2])))
+    if not res:
+        print("\nNo angles found, so no histogram.")
+        return
     counts, bin_edges = np.histogram(res, bins=20, range=(0, int(math.ceil(max(res)))))
 
     labels = [

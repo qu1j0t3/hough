@@ -1,7 +1,9 @@
 # common hough paths
+debug/
 in/
 out/
 process/
+temp/
 
 # vi junk
 *.csv
