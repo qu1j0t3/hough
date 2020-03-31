@@ -2,9 +2,11 @@
 
 <p align="center">
 <a href="https://github.com/wohali/hough/actions"><img alt="Actions Status" src="https://github.com/wohali/hough/workflows/Tests/badge.svg"></a>
-<a href="https://github.com/wohali/hough/blob/master/COPYING"><img src="https://img.shields.io/github/license/wohali/hough.svg" alt="GitHub license" /></a>
+<a href="https://pypi.org/project/hough/"><img alt="PyPI" src="https://img.shields.io/pypi/v/hough"></a>
+<a href="https://pypi.org/project/hough/"><img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/hough"></a>
+<a href="https://github.com/wohali/hough/blob/master/COPYING"><img src="https://img.shields.io/github/license/wohali/hough.svg" alt="GPL v2.0 License" /></a>
 <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
-<a href="https://codecov.io/gh/wohali/hough"><img src="https://codecov.io/gh/wohali/hough/branch/master/graph/badge.svg" /></a>
+<a href="https://codecov.io/gh/wohali/hough"><img alt="Coverage stats" src="https://codecov.io/gh/wohali/hough/branch/master/graph/badge.svg" /></a>
 </p>
 
 _Hough_ finds skew angles in scanned document pages, using the Hough transform.
@@ -16,20 +18,16 @@ want this - analysis and image processing is very CPU intensive!)
 
 ## Installation
 
-Eventually, this will be published, so you'll be able to run `pip install hough`.
-It requires Python 3.7+ to run.
-
-For now, you'll need to install [Poetry](https://python-poetry.org/docs/#installation),
-then run:
-
 ```
-poetry run pip install -U pip setuptools
-poetry install
-poetry shell
+pip install -U pip
+pip install hough
 ```
 
-The first line is required to update `pip` to a new enough version to be compatible with
-`manylinux` wheel packaging, required for PyMuPDF.
+The first line is required to update `pip` to a new enough version to be
+compatible with `manylinux` wheel packaging, required for PyMuPDF.
+
+Older versions of `pip` are fine, but you'll have to install MuPDF, its
+headers, and a compiler first, so PyMuPDF can be compiled locally.
 
 ## Usage
 
@@ -57,12 +55,12 @@ hough -v --histogram Able_Attach_Sep83.pdf
 The deskewing results are placed in the `results.csv` file. Example:
 
 ```csv
-"Input File","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"
-"/home/toby/my-pages/orig/a--0000.pgm.tif",-0.07699791151672428,0.001073874144832815,5014,6659
-"/home/toby/my-pages/orig/a--0001.pgm.tif",,,5018,6630
-"/home/toby/my-pages/orig/a--0002.pgm.tif",0.24936351676615068,0.005137031681286154,5021,6629
-"/home/toby/my-pages/orig/a--0003.pgm.tif",,,5020,6608
-"/home/toby/my-pages/orig/a--0004.pgm.tif",-0.037485115754500545,0.025945115897015238,5021,6616
+"Input File","Page Number","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"
+"/home/toby/my-pages/orig/a--0000.pgm.tif",,-0.07699791151672428,0.001073874144832815,5014,6659
+"/home/toby/my-pages/orig/a--0001.pgm.tif",,,,5018,6630
+"/home/toby/my-pages/orig/a--0002.pgm.tif",,0.24936351676615068,0.005137031681286154,5021,6629
+"/home/toby/my-pages/orig/a--0003.pgm.tif",,,,5020,6608
+"/home/toby/my-pages/orig/a--0004.pgm.tif",,-0.037485115754500545,0.025945115897015238,5021,6616
 ```
 
 The program should work on various image input formats, and with both grey scale
@@ -107,25 +105,32 @@ hough - straighten scanned pages using the Hough transform.
 
 Usage:
   hough (-h | --help)
-  hough [options] <file>...
+  hough [options] [FILE] ...
+  hough [options] [--results=<file>] [FILE] ...
+  hough (-r | --rotate) [options] [--results=<file>]
+  hough (-r | --rotate) [options] [--results=<file>] [FILE] ...
 
 Arguments:
-  file                          Input file(s) to process
+  FILE                          input files to analyze/rotate
 
 Options:
-  -h --help                     Display this help and exit
+  -h --help                     display this help and exit
+  --version                     display the version number and exit
   -v --verbose                  print status messages
-  -d --debug                    retain debug image output in out/ directory
+  -d --debug                    retain debug image output in debug/ dir
                                 (also enables --verbose)
-  --version                     Display the version number and exit
-  -c --csv                      Save rotation results in CSV format
-  --results=<file>              Save rotation results to named file.
-                                Extension comes from format (.csv, ...)
-                                [default: results]
-  --histogram                   Display rotation angle histogram summary
-                                (implies --csv)
-  -j <jobs> --jobs=<jobs>       Specify the number of jobs to run
+  --histogram                   display rotation angle histogram summary
+  -o DIR, --out=DIR             store output results/images in named
+                                directory. Directory is created if it
+                                does not exist [default: out/TIMESTAMP]
+  --results=<file>              save results in FILE under output path,
+                                or specify path to results file for
+                                rotation [default: results.csv]
+  -w <workers> --workers=<#>    specify the number of workers to run
                                 simultaneously. Default: total # of CPUs
+  -r --rotate                   rotates the files passed on the command
+                                line, or if none given, those listed
+                                in the results file.
 ```
 
 # Examples
@@ -141,7 +146,7 @@ There's a few guidelines you should follow to get the best deskewing results
 from your document scans:
 
 1. Bilevel (black-and-white) bitmaps will produce lower quality results.
-   For best results, scan to greyscale or RGB first, deskew with Hough, then
+   For best results, scan to greyscale or RGB first, deskew with _Hough_, then
    reduce the colour depth to bilevel.
 1. Hough deskewing is an inexact process, with many heuristics discovered
    by trial and error. _Hough_ may not work well on your material without tuning
@@ -151,12 +156,13 @@ from your document scans:
 
 You can spy on _Hough_'s attempts to perform deskewing by passing the `--debug`
 flag on the command line. The generated images, and any detected lines in them,
-are placed in the `out/<datetime>/` directory.
+are placed in the `debug/<datetime>/` directory.
 
 Note that _Hough_ cannot always determine a skew for a page (e.g. blank pages
 in particular), and will very occasionally get the skew wrong (depending on
 source material). It's worth reviewing these images if _Hough_ makes a bad
-decision on your scans.
+decision on your scans. Please submit these files along with the original image
+when filing an issue!
 
 ## Recommended scanners
 
@@ -175,11 +181,25 @@ The authors have tested this software with output from the following scanners:
   * 11"x17" and duplex capable
   * Can scan directly to the network or to a memory stick
 
-## License notice
+# Developing
+
+First, clone this repo.
+
+You'll need to install [Poetry](https://python-poetry.org/docs/#installation),
+then run:
+
+```
+poetry run pip install -U pip setuptools
+poetry install
+poetry shell
+```
+
+# License notice
 
 ```
 This file is part of "hough", which detects skew angles in scanned images
-Copyright (C) 2016-2020 Toby Thain, toby@telegraphics.com.au
+Copyright (C) 2016-2020 Toby Thain <toby@telegraphics.com.au>
+Copyright (C) 2020 Joan Touzet <wohali@apache.org>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -28,8 +28,29 @@ name = "hough"
 version = "0.2.0"
 description = "Skew detection and correction in scanned images"
 authors = ["qu1j0t3 <support@telegraphics.com.au>", "Joan Touzet <wohali@apache.org>"]
+maintainers = ["Joan Touzet <wohali@apache.org>"]
+repository = "https://github.com/wohali/hough"
+keywords = ["hough", "scan", "rotate", "skew"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Multimedia :: Graphics :: Capture :: Scanners",
+]
 license = "GPL-2.0-only"
 readme = "README.md"
+packages = [
+    { include = "hough" },
+    { include = "tests", format = "sdist" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
