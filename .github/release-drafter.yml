@@ -1,0 +1,27 @@
+categories:
+  - title: 'Breaking Changes'
+    label: 'breaking'
+  - title: 'Build System'
+    label: 'build'
+  - title: 'Continuous Integration'
+    label: 'ci'
+  - title: 'Documentation'
+    label: 'documentation'
+  - title: 'Features'
+    label: 'enhancement'
+  - title: 'Fixes'
+    label: 'bug'
+  - title: 'Performance'
+    label: 'performance'
+  - title: 'Refactoring'
+    label: 'refactoring'
+  - title: 'Removals and Deprecations'
+    label: 'removal'
+  - title: 'Style'
+    label: 'style'
+  - title: 'Testing'
+    label: 'testing'
+template: |
+  ## What’s Changed
+
+  $CHANGES

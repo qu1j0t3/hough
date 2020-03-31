@@ -49,7 +49,7 @@ def test_vert():
     res = results[0]
     assert res[0] == "av-000.tif"
     assert res[1] == ""
-    assert res[2] > -1.05 and res[2] <= 0.0
+    assert res[2] > -2 and res[2] <= 0.0
     assert res[3] == ""
     # assert(res[4] == 928)
     # assert(res[5] == 1290)
