@@ -23,7 +23,12 @@ repos:
     -   id: check-added-large-files
         args: ['--maxkb=1024']
     -   id: check-toml
--   repo: https://gitlab.com/PyCQA/flake8
-    rev: 3.7.9
+-   repo: local
     hooks:
-    -   id: flake8
+    -   id: flakehell
+        name: flakehell (flake8 wrapper)
+        description: flake8 wrapper for pyproject.toml compat
+        entry: flakehell
+        args: ['lint']
+        language: python
+        types: [python]

@@ -1,5 +1,5 @@
 """
-Worker functions for a parallelizable deskewer.
+Worker functions for a parallelizable skew analyser.
 """
 import logging
 import os
@@ -108,7 +108,10 @@ def get_pages(f):
     """Returns the pages in the file, as a list of tuples of the form:
         [(filename, "mime/type", pagenum), ... ]
     """
-    kind = filetype.guess(f)
+    try:
+        kind = filetype.guess(f)
+    except (FileNotFoundError, IsADirectoryError):
+        return []
     if not kind:
         return [(f, None, None)]
     if kind.mime == "application/pdf":
@@ -120,7 +123,7 @@ def get_pages(f):
         return [(f, kind.mime, None)]
 
 
-def process_page(tuple):
+def analyse_page(tuple):
     f, mimetype, page = tuple
     logger = logging.getLogger("hough")
     if page is None:
@@ -128,7 +131,7 @@ def process_page(tuple):
         try:
             image = imread(f)
             logger.info(f"Processing {f}...")
-            return [process_image(f, image, logger)]
+            return [analyse_image(f, image, logger)]
         except ValueError as e:
             # Fall through; might be multi-page anyway...
             logger.debug(f"Single-page read of {f} failed: {e}")
@@ -136,6 +139,7 @@ def process_page(tuple):
         results = []
         doc = fitz.open(f)
         imagelist = doc.getPageImageList(page)
+        # TODO: Correctly deal with multiple images on a page (in imagelist)
         for item in imagelist:
             xref = item[0]
             smask = item[1]
@@ -144,7 +148,7 @@ def process_page(tuple):
                 logger.info(f"Processing {f} - page {page+1} - xref {xref}...")
                 try:
                     image = imread(imgdict["image"])
-                    results.append(process_image(f, image, logger, pagenum=(page + 1)))
+                    results.append(analyse_image(f, image, logger, pagenum=(page + 1)))
                 except ValueError as e:
                     logger.error(f"Skipping {f} - page {page+1} - xref {xref}: {e}")
             else:
@@ -159,14 +163,14 @@ def process_page(tuple):
         return []
 
 
-def process_file(f):
+def analyse_file(f):
     results = []
     for page in get_pages(f):
-        results += process_page(page)
+        results += analyse_page(page)
     return results
 
 
-def process_image(f, page, logger, pagenum=None):
+def analyse_image(f, page, logger, pagenum=None):
     global debug, now
     if "debug" not in globals():
         debug = False
@@ -174,6 +178,7 @@ def process_image(f, page, logger, pagenum=None):
         import datetime
 
         now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
+    pagenum = int(pagenum) if pagenum is not None else ""
 
     filename = os.path.basename(f)
 
@@ -189,7 +194,7 @@ def process_image(f, page, logger, pagenum=None):
 
     if is_low_contrast(pos):
         logger.debug(f"{filename}  p{pagenum} - low contrast - blank page?")
-        return (f, "", "", "", pagew, pageh)
+        return (f, pagenum, "", "", pagew, pageh)
 
     neg = invert(pos)
 
@@ -289,7 +294,7 @@ def process_image(f, page, logger, pagenum=None):
 
     return (
         f,
-        int(pagenum) if pagenum is not None else "",
+        pagenum,
         angle if angle is not None else "",
         np.var(angles) if angles else "",
         pagew,

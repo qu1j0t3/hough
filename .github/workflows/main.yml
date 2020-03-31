@@ -21,7 +21,7 @@ jobs:
           python-version: 3.7
       - name: Linting
         run: |
-          pip install pre-commit
+          pip install pre-commit flakehell
           pre-commit run --all-files
 
   Linux:
@@ -123,6 +123,7 @@ jobs:
     - name: Test
       run: |
         $env:Path += ";$env:Userprofile\.poetry\bin"
+        fsutil file createnew pytest.ini 0
         poetry run pytest -q tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1

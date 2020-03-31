@@ -22,27 +22,35 @@
 
 Usage:
   hough (-h | --help)
-  hough [options] <file>...
+  hough [options] [FILE] ...
+  hough [options] [--results=<file>] [FILE] ...
+  hough (-r | --rotate) [options] [--results=<file>]
+  hough (-r | --rotate) [options] [--results=<file>] [FILE] ...
 
 Arguments:
-  file                          Input file(s) to process
+  FILE                          input files to analyze/rotate
 
 Options:
-  -h --help                     Display this help and exit
+  -h --help                     display this help and exit
+  --version                     display the version number and exit
   -v --verbose                  print status messages
-  -d --debug                    retain debug image output in debug/ directory
+  -d --debug                    retain debug image output in debug/ dir
                                 (also enables --verbose)
-  --version                     Display the version number and exit
-  -c --csv                      Save rotation results in CSV format
-  --results=<file>              Save rotation results to named file.
-                                Extension comes from format (.csv, ...)
-                                [default: results]
-  --histogram                   Display rotation angle histogram summary
-                                (implies --csv)
-  -w <workers> --workers=<#>    Specify the number of workers to run
+  --histogram                   display rotation angle histogram summary
+  -o DIR, --out=DIR             store output results/images in named
+                                directory. Directory is created if it
+                                does not exist [default: out/TIMESTAMP]
+  --results=<file>              save results in FILE under output path,
+                                or specify path to results file for
+                                rotation [default: results.csv]
+  -w <workers> --workers=<#>    specify the number of workers to run
                                 simultaneously. Default: total # of CPUs
+  -r --rotate                   rotates the files passed on the command
+                                line, or if none given, those listed
+                                in the results file.
 """
 
+import csv
 import datetime
 import logging
 import os
@@ -55,8 +63,7 @@ from tqdm import tqdm
 
 import hough
 
-from . import log_utils, process
-from .stats import histogram
+from . import log_utils
 
 
 def _abort(pool=None, log_queue=None, listener=None):
@@ -84,59 +91,99 @@ def _abort(pool=None, log_queue=None, listener=None):
         traceback.print_exc(file=sys.stderr)
 
 
-def run(argv=sys.argv[1:]):
-    arguments = docopt(__doc__, argv=argv, version=hough.__version__, more_magic=True)
-
+def _process_args(arguments):
     if arguments.debug:
         arguments["verbose"] = True
-        log_level = logging.DEBUG
+        arguments["log_level"] = logging.DEBUG
     elif arguments.verbose:
-        log_level = logging.INFO
+        arguments["log_level"] = logging.INFO
     else:
-        log_level = logging.WARNING
-    results_file = arguments.results + ".csv"
-    arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
-    if arguments.histogram:
-        arguments["csv"] = True
-    if arguments.workers:
-        workers = int(arguments.workers)
-    else:
-        workers = cpu_count()
-    pbar_disable = arguments.quiet or arguments.verbose or arguments.debug
+        arguments["log_level"] = logging.WARNING
+    arguments["pbar_disable"] = arguments.quiet or arguments.verbose or arguments.debug
 
+    arguments["now"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
+    if arguments.out == "out/TIMESTAMP":
+        arguments["out"] = f"out/{arguments.now}"
+    else:
+        arguments["out"] = os.path.abspath(arguments.out)
+    if not os.path.isdir(arguments.out):
+        try:
+            os.makedirs(arguments.out)
+        except Exception:
+            print(f"Unable to create output directory f{arguments.out}! Exiting...")
+            return -1
     if arguments.debug and not os.path.isdir(f"debug/{arguments.now}"):
         os.makedirs(f"debug/{arguments.now}")
 
-    logq, listener = log_utils.start_logger_process(log_level, results_file)
+    # --rotate needs files to process, or results
+    if arguments.rotate and len(arguments.FILE) == 0:
+        if (
+            not os.path.exists(arguments.results)
+            or os.path.getsize(arguments.results) == 0
+        ):
+            print(
+                f"No results in {arguments.results} to rotate and no files specified!"
+            )
+            return -1
+    # --rotate with args, or files given. Was a results file path specified?
+    elif os.path.split(arguments.results)[0]:
+        arguments["results"] = os.path.abspath(arguments.results)
+    else:
+        arguments["results"] = os.path.join(arguments.out, arguments.results)
+
+    if arguments.workers:
+        arguments["workers"] = int(arguments.workers)
+    else:
+        arguments["workers"] = cpu_count()
+
+    return arguments
+
+
+def run(argv=sys.argv[1:]):
+    if len(argv) == 0:
+        print(__doc__.strip("\n"))
+        return 0
+    arguments = docopt(__doc__, argv=argv, version=hough.__version__, more_magic=True)
+    arguments = _process_args(arguments)
+    if arguments == -1:
+        return -1
+
+    logq, listener = log_utils.start_logger_process(
+        arguments.log_level, arguments.results
+    )
 
     results = []
 
     # The pool that launched 1,000 Houghs...
     # We do it this way, not with a map, until https://github.com/tqdm/tqdm/issues/548 is fixed
     with Pool(
-        processes=workers,
-        initializer=process._init_worker,
+        processes=arguments.workers,
+        initializer=hough.analyse._init_worker,
         initargs=(logq, arguments.debug, arguments.now,),
     ) as p:
         try:
-            pages = []
-            for f in arguments.file:
-                pages += process.get_pages(f)
-
             log_utils.setup_queue_logging(logq)
             logger = logging.getLogger("hough")
             logger.info(
                 f"=== Run started @ {datetime.datetime.utcnow().isoformat()} ==="
             )
 
-            with tqdm(total=len(pages), disable=pbar_disable, unit="pg") as pbar:
-                for i, result in enumerate(
-                    p.imap_unordered(process.process_page, pages)
-                ):
-                    pbar.update()
-                    results.append(result)
-            # for result in p.imap_unordered(process.process_page, pages):
-            #    results.append(result)
+            pages = []
+            for f in arguments.FILE:
+                pages += hough.get_pages(f)
+
+            if pages:
+                with tqdm(
+                    total=len(pages),
+                    disable=arguments.pbar_disable,
+                    unit="pg",
+                    desc="Analysis: ",
+                ) as pbar:
+                    for i, result in enumerate(
+                        p.imap_unordered(hough.analyse_page, pages)
+                    ):
+                        pbar.update()
+                        results.append(result)
             p.close()
             p.join()
         except KeyboardInterrupt:
@@ -146,26 +193,34 @@ def run(argv=sys.argv[1:]):
             _abort(p, logq, listener)
             return -1
 
-    if arguments.csv:
-        logger_csv = logging.getLogger("csv")
-        if not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
-            logger_csv.info(
-                '"Input File","Page Number","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
-            )
+    logger_csv = logging.getLogger("csv")
+    if not os.path.exists(arguments.results) or os.path.getsize(arguments.results) == 0:
+        logger_csv.info(
+            '"Input File","Page Number","Computed angle","Variance of computed angles","Image width (px)","Image height (px)"'
+        )
 
-    for result in results:
-        for image in result:
-            (fname, pagenum, angle, variance, pagew, pageh) = image
-            if arguments.csv:
-                logger_csv.info(
-                    '"{}",{},{},{},{},{}'.format(
-                        fname, pagenum, angle, variance, pagew, pageh,
-                    )
-                )
+    read_csv = False
+    # might be rotating a previously generated csv file...
+    if (
+        not results
+        and os.path.exists(arguments.results)
+        and os.path.getsize(arguments.results) > 0
+    ):
+        with open(arguments.results, newline="") as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                if row[0] == "Input File":
+                    continue
+                for idx in [1, 4, 5]:
+                    row[idx] = int(row[idx]) if row[idx] else ""
+                for idx in [2, 3]:
+                    row[idx] = float(row[idx]) if row[idx] else ""
+                results.append([tuple(row)])
+        read_csv = True
 
     if arguments.histogram:
         try:
-            histogram(results)
+            hough.histogram(results)
         except Exception:
             import sys
             import traceback
@@ -173,6 +228,37 @@ def run(argv=sys.argv[1:]):
             logger.error(f"Exception in histogram process: \n{traceback.format_exc()}")
             _abort(None, logq, listener)
             return -1
+
+    dictresults = {}
+    num_pages = 0
+    for result in results:
+        for image in result:
+            num_pages += 1
+            dictresults.setdefault(image[0], []).append(image)
+            (fname, pagenum, angle, variance, pagew, pageh) = image
+            if not read_csv:
+                logger_csv.info(
+                    '"{}",{},{},{},{},{}'.format(
+                        fname, pagenum, angle, variance, pagew, pageh,
+                    )
+                )
+
+    if arguments.rotate:
+        with tqdm(
+            total=num_pages,
+            disable=arguments.pbar_disable,
+            unit="pg",
+            desc="Rotation: ",
+        ) as pbar:
+            for f in dictresults:
+                for i, result in enumerate(
+                    hough.rotate(
+                        sorted(dictresults[f], key=lambda x: int(x[1]) if x[1] else 0),
+                        arguments.out,
+                        generator=True,
+                    )
+                ):
+                    pbar.update()
 
     logger.info(f"=== Run ended @ {datetime.datetime.utcnow().isoformat()} ===")
 

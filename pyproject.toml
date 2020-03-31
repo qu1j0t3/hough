@@ -1,5 +1,28 @@
 # Big thanks to https://medium.com/georgian-impact-blog/python-tooling-makes-a-project-tick-181d567eea44
 
+[tool.coverage.run]
+branch = true
+source = ["hough"]
+concurrency = ["multiprocessing"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "except KeyboardInterrupt",
+    "if __name__ == .__main__.:",
+]
+
+[tool.flakehell]
+max_line_length = 88
+format = "colored"
+exclude = [".venv",".git","__pycache__","doc/*","build","dist",".tox"]
+select = ["C", "E", "F", "W", "B", "B950"]
+ignore = ["E203", "E501", "W503"]
+show_source = true
+
+
 [tool.poetry]
 name = "hough"
 version = "0.2.0"
@@ -20,23 +43,25 @@ pip = "20.0.2"
 pymupdf = "^1.16.15"
 filetype = "^1.0.6"
 tqdm = "^4.43.0"
+coverage = {extras = ["toml"], version = "^5.0.4"}
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
-flake8 = "^3.7.9"
+#flake8 = "^3.7.9"
 isort = "^4.3.21"
 pytest = "^5.4"
 pre-commit = "^2.2.0"
 pytest-cov = "^2.8.1"
 pytest-mock = "^2.0.0"
-coverage = "^5.0.4"
+coverage = {extras = ["toml"], version = "^5.0.4"}
 tox = "^3.14.6"
+flakehell = "^0.3.3"
 
 [tool.poetry.scripts]
 hough = 'hough.cli:run'
 
 [tool.isort]
-known_third_party = ["docopt", "filetype", "fitz", "imageio", "numpy", "skimage", "termplotlib", "tqdm"]
+known_third_party = ["docopt", "filetype", "fitz", "imageio", "numpy", "pytest", "scipy", "skimage", "termplotlib", "tqdm"]
 multi_line_output = 3
 lines_after_imports = 2
 force_grid_wrap = 0
