@@ -25,7 +25,7 @@ show_source = true
 
 [tool.poetry]
 name = "hough"
-version = "0.2.0"
+version = "0.2.1"
 description = "Skew detection and correction in scanned images"
 authors = ["qu1j0t3 <support@telegraphics.com.au>", "Joan Touzet <wohali@apache.org>"]
 maintainers = ["Joan Touzet <wohali@apache.org>"]
@@ -65,6 +65,7 @@ pymupdf = "^1.16.15"
 filetype = "^1.0.6"
 tqdm = "^4.43.0"
 coverage = {extras = ["toml"], version = "^5.0.4"}
+importlib_metadata = {version = "^1.6.0", python = "<3.8"}
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

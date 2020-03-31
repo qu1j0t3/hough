@@ -4,8 +4,17 @@ from .rotate import rotate
 from .stats import histogram
 
 
-WINDOW_SIZE = 150
+try:
+    from importlib.metadata import version, PackageNotFoundError  # type: ignore
+except ImportError:  # pragma: no cover
+    from importlib_metadata import version, PackageNotFoundError  # type: ignore
 
-__version__ = "0.2.0"
+
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "unknown"
+
+WINDOW_SIZE = 150
 
 __all__ = ["analyse_file", "analyse_page", "get_pages", "run", "rotate", "histogram"]
