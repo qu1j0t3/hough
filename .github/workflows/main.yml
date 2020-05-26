@@ -48,9 +48,11 @@ jobs:
       with:
         path: .venv
         key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    - name: Install dependencies
+    - name: Update pip & setuptools
       run: |
         poetry run pip install --user -U pip setuptools
+    - name: Install dependencies
+      run: |
         poetry install
     - name: Test
       run: poetry run pytest -q tests
@@ -81,9 +83,11 @@ jobs:
       with:
         path: .venv
         key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    - name: Install dependencies
+    - name: Update pip & setuptools
       run: |
         poetry run pip install --user -U pip setuptools
+    - name: Install dependencies
+      run: |
         poetry install
     - name: Test
       run: poetry run pytest -q tests
@@ -115,10 +119,13 @@ jobs:
       with:
         path: .venv
         key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+    - name: Update pip & setuptools
+      run: |
+        $env:Path += ";$env:Userprofile\.poetry\bin"
+        poetry run pip install --user -U pip setuptools
     - name: Install dependencies
       run: |
         $env:Path += ";$env:Userprofile\.poetry\bin"
-        #poetry run pip install --user -U pip setuptools
         poetry install
     - name: Test
       run: |
