@@ -648,7 +648,7 @@ description = "Plotting on the command line"
 name = "termplotlib"
 optional = false
 python-versions = ">=3.5"
-version = "0.3.0"
+version = "0.3.1"
 
 [package.dependencies]
 importlib-metadata = "*"
@@ -764,7 +764,6 @@ version = "1.11.2"
 [[package]]
 category = "main"
 description = "Backport of pathlib-compatible object wrapper for zip files"
-marker = "python_version < \"3.8\""
 name = "zipp"
 optional = false
 python-versions = ">=3.6"
@@ -1226,8 +1225,8 @@ termcolor = [
     {file = "termcolor-1.1.0.tar.gz", hash = "sha256:1d6d69ce66211143803fbc56652b41d73b4a400a2891d7bf7a1cdf4c02de613b"},
 ]
 termplotlib = [
-    {file = "termplotlib-0.3.0-py3-none-any.whl", hash = "sha256:cce66cd89feded8beb07e92dbef12ff6a22f7dc477bc4d2d5a1697bf3ba0ff80"},
-    {file = "termplotlib-0.3.0.tar.gz", hash = "sha256:6aafd512e6a9b0e92035c9c47d851b8197717a7b1db28d108680367352460349"},
+    {file = "termplotlib-0.3.1-py3-none-any.whl", hash = "sha256:f12ee8ca58af0f6132fd90f88a3a51bd56efa8d88ad38577916cc5e466af1471"},
+    {file = "termplotlib-0.3.1.tar.gz", hash = "sha256:568e44a3a382eca0ab04d8f695b5d4f0e5ffd1daba909df3473a9e706a3cb49f"},
 ]
 toml = [
     {file = "toml-0.10.0-py2.7.egg", hash = "sha256:f1db651f9657708513243e61e6cc67d101a39bad662eaa9b5546f789338e07a3"},
