@@ -164,7 +164,7 @@ description = "Infer file type and MIME type of any file/buffer. No external dep
 name = "filetype"
 optional = false
 python-versions = "*"
-version = "1.0.6"
+version = "1.0.7"
 
 [[package]]
 category = "dev"
@@ -867,8 +867,8 @@ filelock = [
     {file = "filelock-3.0.12.tar.gz", hash = "sha256:18d82244ee114f543149c66a6e0c14e9c4f8a1044b5cdaadd0f82159d6a6ff59"},
 ]
 filetype = [
-    {file = "filetype-1.0.6-py2.py3-none-any.whl", hash = "sha256:fd6d0ec56820acccf8c9fb6c3ba7e04a302f6ff6c70bcc09daf4842ae9e2ac30"},
-    {file = "filetype-1.0.6.tar.gz", hash = "sha256:99d2b923921cadbe6e451249091ca7156b4beaee6e741bd711a582d4dd2f2881"},
+    {file = "filetype-1.0.7-py2.py3-none-any.whl", hash = "sha256:353369948bb1c09b8b3ea3d78390b5586e9399bff9aab894a1dff954e31a66f6"},
+    {file = "filetype-1.0.7.tar.gz", hash = "sha256:da393ece8d98b47edf2dd5a85a2c8733e44b769e32c71af4cd96ed8d38d96aa7"},
 ]
 flake8 = [
     {file = "flake8-3.7.9-py2.py3-none-any.whl", hash = "sha256:49356e766643ad15072a789a20915d3c91dc89fd313ccd71802303fd67e4deca"},
