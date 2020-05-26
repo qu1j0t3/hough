@@ -21,7 +21,7 @@ jobs:
         uses: dschep/install-poetry-action@v1.2
       - name: Install dependencies
         run: |
-          poetry run pip install -U pip setuptools
+          poetry run pip install -U --user pip setuptools
           poetry install
       - name: Build
         run: poetry build
