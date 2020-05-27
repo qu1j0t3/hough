@@ -12,7 +12,7 @@ from hough.log_utils import start_logger_process
 
 @pytest.mark.usefixtures("clean_sampledir")
 def test_version():
-    assert __version__ == "0.2.1"
+    assert __version__
 
 
 @pytest.mark.usefixtures("sampledir")
