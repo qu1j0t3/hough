@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python 3.7
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v2
         with:
           python-version: 3.7
       - name: Linting
@@ -34,29 +34,24 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
     - name: Get full python version
       id: full-python-version
       run: |
         echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
-    - name: Install Poetry
-      uses: dschep/install-poetry-action@v1.2
-    - name: Set up cache
-      uses: actions/cache@v1
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    - name: Update pip & setuptools
+    - name: Install and configure poetry
       run: |
-        poetry run pip install -U pip setuptools
+        python -m pip install --upgrade pip setuptools
+        python -m pip --version
+        python -m pip install poetry
+        python -m poetry --version
+        python -m poetry config virtualenvs.create false
     - name: Install dependencies
-      run: |
-        poetry run pip --version
-        poetry install
+      run: python -m poetry install
     - name: Test
-      run: poetry run pytest -q tests
+      run: python -m pytest -q tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
 
@@ -70,28 +65,24 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
     - name: Get full python version
       id: full-python-version
       run: |
         echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
-    - name: Install Poetry
-      uses: dschep/install-poetry-action@v1.2
-    - name: Set up cache
-      uses: actions/cache@v1
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    - name: Update pip & setuptools
+    - name: Install and configure poetry
       run: |
-        poetry run pip install --user -U pip setuptools
+        python -m pip install --upgrade pip setuptools
+        python -m pip --version
+        python -m pip install poetry
+        python -m poetry --version
+        python -m poetry config virtualenvs.create false
     - name: Install dependencies
-      run: |
-        poetry install
+      run: python -m poetry install
     - name: Test
-      run: poetry run pytest -q tests
+      run: python -m pytest -q tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
 
@@ -105,7 +96,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
     - name: Get full python version
@@ -113,25 +104,18 @@ jobs:
       shell: bash
       run: |
         echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
-    - name: Install Poetry
-      uses: dschep/install-poetry-action@v1.2
-    - name: Set up cache
-      uses: actions/cache@v1
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ steps.full-python-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    - name: Update pip & setuptools
+    - name: Install and configure poetry
       run: |
-        $env:Path += ";$env:Userprofile\.poetry\bin"
-        poetry run pip install --user -U pip setuptools
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip --version
+        python -m pip install poetry
+        python -m poetry --version
+        python -m poetry config virtualenvs.create false
     - name: Install dependencies
-      run: |
-        $env:Path += ";$env:Userprofile\.poetry\bin"
-        poetry install
+      run: python -m poetry install
     - name: Test
       run: |
-        $env:Path += ";$env:Userprofile\.poetry\bin"
         fsutil file createnew pytest.ini 0
-        poetry run pytest -q tests
+        python -m pytest -q tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
