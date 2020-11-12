@@ -25,7 +25,7 @@ show_source = true
 
 [tool.poetry]
 name = "hough"
-version = "0.2.3"
+version = "0.2.6"
 description = "Skew detection and correction in scanned images"
 authors = ["qu1j0t3 <support@telegraphics.com.au>", "Joan Touzet <wohali@apache.org>"]
 maintainers = ["Joan Touzet <wohali@apache.org>"]
