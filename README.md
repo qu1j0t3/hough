@@ -41,7 +41,7 @@ but may not work well on your material without tuning and modification.
 * Activate it:
   - `source .venv/bin/activate`
 * Install Python dependencies:
-  - `pip install -r requirements.txt`
+  - `pip3 install -r requirements.txt`
 
 #### Troubleshooting
 
