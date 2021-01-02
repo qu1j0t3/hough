@@ -26,4 +26,4 @@ echo "(Adjust these defaults in distribute.sh)"
 echo "Debugging output in out/    (please review after run)"
 echo 'Rotated output in process/  (note that pages are skipped if skew was not computable!)'
 
-(xargs -n 1 -P 4 ./skew.py) | xargs -n 1 -P 2 ./rotate.sh
+(xargs -n 1 -P $CORES ./skew.py) | xargs -n 1 -P $RCORES ./rotate.sh

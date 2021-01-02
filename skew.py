@@ -85,7 +85,11 @@ for f in sys.argv[1:]:
         eprint("{} - low contrast - blank page?".format(filename))
     else:
         #neg = img_as_ubyte(pos < t)
-        neg = 255-pos
+        # pos page is 0 = black, 255 = white
+        # remove lightest 20% of grey pixels to reduce false positives on h/v rule detection
+        thr = 255*0.8
+        p = np.clip(pos, 0, thr)
+        neg = thr-p
 
         # ----------
         # find row with maximum sum - this should pass thru the centre of the horizontal rule
@@ -119,9 +123,8 @@ for f in sys.argv[1:]:
         col = hsums.argmax(0)
 
         # Detect edges
-        cropped = pos[:, max(col-150, 0):min(col+150, pageh)]
-        c = canny(cropped, 2)
-        edges = binary_dilation(c)
+        cropped = pos[:, max(col-150, 0):min(col+150, pagew)]
+        edges = binary_dilation(canny(cropped, 2))
         vedgesg = greyf(edges)
 
         # Now try Hough transform
