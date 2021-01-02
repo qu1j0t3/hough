@@ -93,10 +93,8 @@ for f in sys.argv[1:]:
 
         # Not duotone: pages04aap.tif,1,0.06716292606481222,210,212,203
 
-
         pct_coloured = num*100.0/den
-        duo = "1" if pct_coloured > 0.12 else ""
-        print(f"{filename},{duo},{pct_coloured:.4f},{num2*100.0/den2:.4f},{rt},{gt},{bt}")
+        print(f"{filename},{pct_coloured:.4f},{num2*100.0/den2:.4f},{rt},{gt},{bt}")
         sys.stdout.flush()
         #print("Pixels % where max - min rgb > 90: {}".format(pct_coloured))
 
