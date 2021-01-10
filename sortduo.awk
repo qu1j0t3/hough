@@ -6,10 +6,12 @@
 # or to bash for sequential run
 
 {
+	if ($4 < 128 || $5 < 128 || $6 < 128) {
+		print "gm convert deskewed/"$1,"-gamma 0.8 -colors 32 -type Palette -compress LZW staged/"$1
+	} else if ($2 >= 0.20) {
 		r=255/$4
 		g=255/$5
 		b=255/$6
-	if ($2 >= 0.20) {
 		print "gm convert deskewed/"$1," -operator Red Multiply",r,"-operator Green Multiply",g,"-operator Blue Multiply",b,"-gamma 0.8 -colors 32 -type Palette -compress LZW staged/"$1
 	} else {
 		print "gm convert deskewed/"$1," -threshold 71% -monochrome -compress Group4 staged/"$1

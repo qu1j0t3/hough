@@ -32,8 +32,9 @@ from skimage.draw import *
 from skimage import img_as_uint, img_as_ubyte
 from skimage.filters import threshold_otsu
 from skimage.util import crop
-from scipy.ndimage import measurements
 from skimage.transform import resize
+import scipy.ndimage
+from scipy.ndimage import measurements
 from imageio import imread, imwrite
 from numpy import *
 
@@ -56,13 +57,28 @@ hough_theta_h  = arange(deg2rad(-93.0), deg2rad(-87.0), hough_prec)
 hough_theta_v  = arange(deg2rad(-3.0), deg2rad(3.0), hough_prec)
 hough_theta_hv = np.concatenate( (hough_theta_v, hough_theta_h) )
 
-def sum(a):
-    return a.sum()
-
 try:
     os.mkdir('out')
 except OSError:
     pass
+
+def hlines(edges, length):
+    lines = probabilistic_hough_line( edges, line_length=int(length), line_gap=2, theta=hough_theta_h)
+    hangles = []
+    for ((x0,y0),(x1,y1)) in lines:
+        # Ensure line is moving rightwards
+        k = 1 if x1 > x0 else -1
+        hangles.append( (True, - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))), x0, y0, x1, y1, length) )
+    return hangles
+
+def vlines(edges, length):
+    lines = probabilistic_hough_line( edges, line_length=int(length), line_gap=2, theta=hough_theta_v)
+    vangles = []
+    for ((x0,y0),(x1,y1)) in lines:
+        # Ensure line is moving upwards
+        k = 1 if y1 > y0 else -1
+        vangles.append( (False, 90 - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))), x0, y0, x1, y1, length) )
+    return vangles
 
 for f in sys.argv[1:]:
     filename = os.path.basename(f)
@@ -91,70 +107,67 @@ for f in sys.argv[1:]:
         p = np.clip(pos, 0, thr)
         neg = thr-p
 
-        # ----------
         # find row with maximum sum - this should pass thru the centre of the horizontal rule
+        # low pass filtering in the desired direction makes detection more reliable
+        hblur = scipy.ndimage.median_filter(neg, size=(51,1))
+        hsums = np.apply_along_axis(sum, 1, hblur)
+        row = hsums.argmax(0)
 
-        vsums = np.apply_along_axis(sum, 1, neg)
-        row = vsums.argmax(0)
+        # Cannot use the raw image with the Hough transform because it will detect lines
+        # within solid areas! So we need to edge detect first.
 
-        # Detect edges
-        cropped = pos[max(row-150, 0):min(row+150, pageh)]
         # This dilation is dangerous if it's going to touch the page edges,
         # since then a lot of 0/90° lines will be found, likely ruining the results.
-        edges = binary_dilation(canny(cropped, 2))
-        hedgesg = greyf(edges)
+        hedges = binary_dilation(canny( pos[max(row-150, 0):min(row+150, pageh)] , 2))
 
-        # Now try Hough transform
-        lines = probabilistic_hough_line( edges, line_length=int(pagew*0.15), line_gap=2, theta=hough_theta_h)
-
-        hangles = []
-        for ((x0,y0),(x1,y1)) in lines:
-            # Ensure line is moving rightwards
-            k = 1 if x1 > x0 else -1
-            hangles.append( - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
-            rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
-            for k, v in enumerate(val):
-                hedgesg[rr[k], cc[k]] = (1-v)*hedgesg[rr[k], cc[k]] + v
-
-        # ----------
         # find col with maximum sum - this should pass thru the centre of a vertical rule
-
-        hsums = np.apply_along_axis(sum, 0, neg)
-        col = hsums.argmax(0)
+        vblur = scipy.ndimage.median_filter(neg, size=(1,51))
+        vsums = np.apply_along_axis(sum, 0, hblur)
+        col = vsums.argmax(0)
 
         # Detect edges
-        cropped = pos[:, max(col-150, 0):min(col+150, pagew)]
-        edges = binary_dilation(canny(cropped, 2))
-        vedgesg = greyf(edges)
+        vedges = binary_dilation(canny( pos[:, max(col-150, 0):min(col+150, pagew)] , 2))
 
-        # Now try Hough transform
-        lines = probabilistic_hough_line( edges, line_length=int(pageh*0.15), line_gap=2, theta=hough_theta_v)
+        lines = hlines(hedges, pagew*0.15) + vlines(vedges, pagew*0.15)
 
-        vangles = []
-        for ((x0,y0),(x1,y1)) in lines:
-            # Ensure line is moving upwards
-            k = 1 if y1 > y0 else -1
-            vangles.append( 90 - rad2deg(math.atan2(k*(y1-y0), k*(x1-x0))) )
-            rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
-            for k, v in enumerate(val):
-                vedgesg[rr[k], cc[k]] = (1-v)*vedgesg[rr[k], cc[k]] + v
-        # ----------
-
-        if hangles and vsums[row] > hsums[col]:
-            angle = a = median(hangles)
-            imwrite('out/{}_{}_hlines.png'.format(filename, a), hedgesg)
-            eprint("{}  Hough H angle: {} deg (median)".format(filename, a))
-        elif vangles:
-            angle = a = median(vangles)
-            imwrite('out/{}_{}_vlines.png'.format(filename, a), vedgesg)
-            eprint("{}  Hough V angle: {} deg (median)".format(filename, a))
+        if len(lines) == 0:
+            imwrite('out/{}_no_hlines.png'.format(filename), greyf(hedges))
+            imwrite('out/{}_no_vlines.png'.format(filename), greyf(vedges))
+            vc = binary_dilation(canny(vblur, 2, low_threshold=100))
+            hc = binary_dilation(canny(hblur, 2, low_threshold=100))
+            lines = hlines(vc, pagew*0.15) + vlines(hc, pagew*0.15)
+            hedgesg = greyf(vc)
+            vedgesg = greyf(hc)
         else:
-            imwrite('out/{}_no_hlines.png'.format(filename), hedgesg)
-            eprint("{}  FAILED horizontal Hough".format(filename))
-            imwrite('out/{}_no_vlines.png'.format(filename), vedgesg)
-            eprint("{}  FAILED vertical Hough".format(filename))
+            hedgesg = greyf(hedges)
+            vedgesg = greyf(vedges)
 
-            # If we didn't find a good feature at the horizontal sum peak,
+        if len(lines) > 0:
+            angle = a = median([x[1] for x in lines])
+            eprint("{}  Hough simple rule angle: {} deg (median) (length {})".format(filename, a, lines[0][6]))
+            hs = 0
+            vs = 0
+            for result in lines:
+                is_h, _, x0, y0, x1, y1, _ = result
+                # draw line for debugging
+                rr, cc, val = line_aa(c0=x0, r0=y0, c1=x1, r1=y1)
+                if is_h:
+                    hs += 1
+                    for k, v in enumerate(val):
+                        hedgesg[rr[k], cc[k]] = (1-v)*hedgesg[rr[k], cc[k]] + v
+                else:
+                    vs += 1
+                    for k, v in enumerate(val):
+                        vedgesg[rr[k], cc[k]] = (1-v)*vedgesg[rr[k], cc[k]] + v
+            if hs > 0:
+                imwrite('out/{}_{}_Hlines.png'.format(filename, a), hedgesg)
+            if vs > 0:
+                imwrite('out/{}_{}_Vlines.png'.format(filename, a), vedgesg)
+        else:
+            #imwrite('out/{}_hblur.png'.format(filename), hblur)
+            #imwrite('out/{}_vblur.png'.format(filename), vblur)
+
+            # If we didn't find a simple rule,
             # let's brutally dilate everything and look for a vertical margin
             small = downscale_local_mean(neg, (2,2))
             t = threshold_otsu(small)
@@ -188,10 +201,10 @@ for f in sys.argv[1:]:
                         edgesg[rr[k], cc[k]] = (1-v)*edgesg[rr[k], cc[k]] + v
 
             if angles:
-                a = mean(angles)
+                a = median(angles)
                 angle = a
                 imwrite('out/{}_{}_lines_vertical.png'.format(filename, a), edgesg)
-                imwrite('out/{}_{}_lines_verticaldilated.png'.format(filename, a), bool_to_255f(dilated))
+                #imwrite('out/{}_{}_lines_verticaldilated.png'.format(filename, a), bool_to_255f(dilated))
                 eprint("{}  angle vertical: {} deg (mean)  {} deg (median)".format(filename, a, median(angles)))
             else:
                 imwrite('out/{}_dilated.png'.format(filename), dilated)
