@@ -164,9 +164,6 @@ for f in sys.argv[1:]:
             if vs > 0:
                 imwrite('out/{}_{}_Vlines.png'.format(filename, a), (vedgesg*255.0).astype(np.uint8))
         else:
-            #imwrite('out/{}_hblur.png'.format(filename), hblur)
-            #imwrite('out/{}_vblur.png'.format(filename), vblur)
-
             # If we didn't find a simple rule,
             # let's brutally dilate everything and look for a vertical margin
             small = downscale_local_mean(neg, (2,2))
