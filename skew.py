@@ -63,6 +63,7 @@ except OSError:
     pass
 
 def hlines(edges, length):
+    # line_length: "Minimum accepted length of detected lines"
     lines = probabilistic_hough_line( edges, line_length=int(length), line_gap=2, theta=hough_theta_h)
     hangles = []
     for ((x0,y0),(x1,y1)) in lines:
@@ -128,14 +129,18 @@ for f in sys.argv[1:]:
         # Detect edges
         vedges = binary_dilation(canny( pos[:, max(col-150, 0):min(col+150, pagew)] , 2))
 
-        lines = hlines(hedges, pagew*0.15) + vlines(vedges, pagew*0.15)
+        # Previously, this threshold was 15% of page width, which for letter size pages is about 1.2"
+        # This doesn't work well for wide foldout pages, so I'm changing it to be relative to height
+        # (approx 11" for both text and foldout pages) and making it longer.
+        linelength = pageh*0.25
+        lines = hlines(hedges, linelength) + vlines(vedges, linelength)
 
         if len(lines) == 0:
             imwrite('out/{}_no_hlines.png'.format(filename), (greyf(hedges)*255.0).astype(np.uint8))
             imwrite('out/{}_no_vlines.png'.format(filename), (greyf(vedges)*255.0).astype(np.uint8))
             vc = binary_dilation(canny(vblur, 2, low_threshold=100))
             hc = binary_dilation(canny(hblur, 2, low_threshold=100))
-            lines = hlines(vc, pagew*0.15) + vlines(hc, pagew*0.15)
+            lines = hlines(vc, linelength) + vlines(hc, linelength)
             hedgesg = greyf(vc)
             vedgesg = greyf(hc)
         else:
