@@ -131,8 +131,8 @@ for f in sys.argv[1:]:
         lines = hlines(hedges, pagew*0.15) + vlines(vedges, pagew*0.15)
 
         if len(lines) == 0:
-            imwrite('out/{}_no_hlines.png'.format(filename), greyf(hedges))
-            imwrite('out/{}_no_vlines.png'.format(filename), greyf(vedges))
+            imwrite('out/{}_no_hlines.png'.format(filename), (greyf(hedges)*255.0).astype(np.uint8))
+            imwrite('out/{}_no_vlines.png'.format(filename), (greyf(vedges)*255.0).astype(np.uint8))
             vc = binary_dilation(canny(vblur, 2, low_threshold=100))
             hc = binary_dilation(canny(hblur, 2, low_threshold=100))
             lines = hlines(vc, pagew*0.15) + vlines(hc, pagew*0.15)
@@ -160,9 +160,9 @@ for f in sys.argv[1:]:
                     for k, v in enumerate(val):
                         vedgesg[rr[k], cc[k]] = (1-v)*vedgesg[rr[k], cc[k]] + v
             if hs > 0:
-                imwrite('out/{}_{}_Hlines.png'.format(filename, a), hedgesg)
+                imwrite('out/{}_{}_Hlines.png'.format(filename, a), (hedgesg*255.0).astype(np.uint8))
             if vs > 0:
-                imwrite('out/{}_{}_Vlines.png'.format(filename, a), vedgesg)
+                imwrite('out/{}_{}_Vlines.png'.format(filename, a), (vedgesg*255.0).astype(np.uint8))
         else:
             #imwrite('out/{}_hblur.png'.format(filename), hblur)
             #imwrite('out/{}_vblur.png'.format(filename), vblur)
@@ -203,12 +203,12 @@ for f in sys.argv[1:]:
             if angles:
                 a = median(angles)
                 angle = a
-                imwrite('out/{}_{}_lines_vertical.png'.format(filename, a), edgesg)
+                imwrite('out/{}_{}_lines_vertical.png'.format(filename, a), (edgesg*255.0).astype(np.uint8))
                 #imwrite('out/{}_{}_lines_verticaldilated.png'.format(filename, a), bool_to_255f(dilated))
                 eprint("{}  angle vertical: {} deg (mean)  {} deg (median)".format(filename, a, median(angles)))
             else:
-                imwrite('out/{}_dilated.png'.format(filename), dilated)
-                imwrite('out/{}_dilate_edges.png'.format(filename), edges)
+                imwrite('out/{}_dilated.png'.format(filename), dilated.astype(np.uint8))
+                imwrite('out/{}_dilate_edges.png'.format(filename), edges.astype(np.uint8))
                 eprint("{}  FAILED vertical".format(filename))
 
     print('"{}",{},{},{},{}'.format(f, angle or '', np.var(angles) if angles else '', pagew, pageh))
