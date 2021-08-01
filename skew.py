@@ -122,7 +122,7 @@ for f in sys.argv[1:]:
 
         # find col with maximum sum - this should pass thru the centre of a vertical rule
         vblur = scipy.ndimage.median_filter(neg, size=(1,51))
-        vsums = np.apply_along_axis(sum, 0, hblur)
+        vsums = np.apply_along_axis(sum, 0, vblur)
         col = vsums.argmax(0)
 
         # Detect edges
